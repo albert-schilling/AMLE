@@ -1,0 +1,44 @@
+[
+  {
+    "id": "T-1001",
+    "customer_id": "1001",
+    "refund_amount": 900.0,
+    "text": "I was charged twice for my subscription this month and need a refund immediately - this is the third time this has happened and I'm considering cancelling."
+  },
+  {
+    "id": "T-1002",
+    "customer_id": "1002",
+    "refund_amount": 0.0,
+    "text": "The export-to-CSV button on the dashboard has been spinning for 10 minutes and never finishes. I can't get my monthly report out."
+  },
+  {
+    "id": "T-1003",
+    "customer_id": "1003",
+    "refund_amount": 0.0,
+    "text": "Hi, I'd like to update the email address on my account to a new one. Not urgent, just whenever you get a chance."
+  },
+  {
+    "id": "T-1004",
+    "customer_id": "1004",
+    "refund_amount": 12.5,
+    "text": "Small thing: I was billed for the add-on I cancelled last week. Can you refund the 12.50 and make sure it doesn't happen again?"
+  },
+  {
+    "id": "T-1005",
+    "customer_id": "1003",
+    "refund_amount": 120.0,
+    "text": "My annual plan renewed on the 3rd but I had downgraded to monthly on the 1st. Could you refund the difference please?"
+  },
+  {
+    "id": "T-2001",
+    "customer_id": "1001",
+    "refund_amount": 120.0,
+    "text": "I got charged twice again this month, same as before. Before you process a refund, can you check whether Stripe (our payment processor) is reporting any current outage that might explain a duplicate charge on their end?"
+  },
+  {
+    "id": "T-2002",
+    "customer_id": "1002",
+    "refund_amount": 0.0,
+    "text": "Following up on my CSV export ticket from earlier: can you check today's app log and tell me how many errors happened at or after 3pm? I want to know if my export failure was part of a bigger problem."
+  }
+]

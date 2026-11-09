@@ -1,0 +1,33 @@
+[project]
+name = "scoutbot"
+version = "0.8.0"
+description = "Reference solution for W8D4: an approval policy decides who signs off, and the reply is sent exactly once"
+requires-python = ">=3.10"
+dependencies = [
+    # Nothing new for W8D3. `interrupt` and the stream writer both ship inside langgraph, so the
+    # day that adds pausing and streaming adds no dependency at all - worth knowing when a student
+    # goes looking for the package that does it.
+    "anthropic>=0.110,<1",
+    # LangGraph as the orchestration layer, from W8D1. No langchain-anthropic - every model call
+    # still goes through the Anthropic SDK directly. That is also why token streaming goes through
+    # `stream_mode="custom"` and a writer rather than `stream_mode="messages"`: there is no
+    # LangChain chat model in the stack for the latter to hook into.
+    "langgraph>=1.2,<2",
+    # From W8D2: the file-backed checkpointer. `InMemorySaver` ships inside langgraph itself, but
+    # it cannot outlive the process it is meant to protect against losing. As of W8D3 a
+    # checkpointer is no longer optional at all, since `interrupt()` needs somewhere to record a
+    # pause.
+    "langgraph-checkpoint-sqlite>=3.1,<4",
+    "pydantic>=2.9,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

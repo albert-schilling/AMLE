@@ -1,0 +1,18 @@
+2026-07-15 09:03:11 INFO  Batch job started
+2026-07-15 09:14:02 INFO  Connected to database
+2026-07-15 10:02:47 ERROR Failed to connect to payment gateway (retry 1)
+2026-07-15 10:03:01 INFO  Retry succeeded
+2026-07-15 11:20:19 WARN  Slow query detected (3.8s)
+2026-07-15 12:45:33 ERROR NullPointerException in refund_handler
+2026-07-15 13:10:05 INFO  Nightly export queued
+2026-07-15 13:58:44 ERROR Timeout while processing webhook for cust_1002
+2026-07-15 14:02:12 INFO  Retrying webhook delivery
+2026-07-15 14:59:59 WARN  Disk usage at 82%
+2026-07-15 15:02:44 ERROR Timeout while processing webhook for cust_1002
+2026-07-15 15:11:30 INFO  Cache cleared
+2026-07-15 15:20:09 WARN  Slow query detected (4.2s)
+2026-07-15 15:41:57 ERROR NullPointerException in export_csv handler
+2026-07-15 15:52:03 ERROR Failed to connect to payment gateway (retry 2)
+2026-07-15 16:03:12 ERROR Timeout while processing webhook for cust_1002
+2026-07-15 16:30:00 INFO  Batch job finished
+2026-07-15 16:41:18 ERROR Disk write failed on export_csv

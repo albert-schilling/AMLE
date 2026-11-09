@@ -1,0 +1,19 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.ipynb_checkpoints/
+*.jsonl
+# Written by run_resume.py. The -wal and -shm companions are SQLite's write-ahead log.
+checkpoints.db
+checkpoints.db-*
+# Written by run_retrieve.py: the embedded knowledge base. Rebuilt from knowledge_base/ on demand.
+knowledge.db
+knowledge.db-*
+# Written by run_memory.py: the per-customer memory store (Week 9 Day 5).
+memory.db
+memory.db-*
+# Written by DeepEval (run_evals.py / run_judge.py): local run-cache and last-run state.
+.deepeval/

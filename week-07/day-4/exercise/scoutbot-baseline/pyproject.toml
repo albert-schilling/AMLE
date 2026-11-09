@@ -1,0 +1,20 @@
+[project]
+name = "scoutbot"
+version = "0.2.0"
+description = "Day 4 starting point (= W7D2's reference solution, unchanged): a bounded ReAct loop with two client tools"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.110,<1",
+    "pydantic>=2.9,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

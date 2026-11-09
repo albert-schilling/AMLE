@@ -1,0 +1,20 @@
+{
+  "1001": {
+    "customer_id": "1001",
+    "plan": "pro",
+    "account_age_days": 430,
+    "past_refunds_90d": 2
+  },
+  "1002": {
+    "customer_id": "1002",
+    "plan": "free",
+    "account_age_days": 12,
+    "past_refunds_90d": 0
+  },
+  "1003": {
+    "customer_id": "1003",
+    "plan": "pro",
+    "account_age_days": 900,
+    "past_refunds_90d": 0
+  }
+}

@@ -1,0 +1,48 @@
+[project]
+name = "scoutbot"
+version = "0.11.0"
+description = "Reference solution for W9D2: a basic RAG agent - a retrieve_knowledge node grounds draft_reply in the retrieved policy passages, so replies cite their source and decline when the corpus does not cover the question"
+requires-python = ">=3.10"
+dependencies = [
+    # New for W9D1, and the first dependency since W8D5's tracing SDK. `fastembed` is the embedding
+    # model runner, chosen because it runs on ONNX Runtime and therefore pulls no PyTorch and no
+    # TensorFlow - the single biggest cross-platform install headache avoided. `numpy` comes along as
+    # a fastembed dependency and is what the cosine search is written in. The vector "store" is an
+    # ordinary SQLite BLOB column, so nothing here is a vector database: at this corpus size a
+    # brute-force dot product against every stored vector is instant and keeps retrieval transparent.
+    # The model (~130MB) is fetched once on first use and cached; retrieval after that is offline.
+    "fastembed>=0.8,<0.9",
+    "numpy>=1.26,<3",
+    # Nothing new for W8D3. `interrupt` and the stream writer both ship inside langgraph, so the
+    # day that adds pausing and streaming adds no dependency at all - worth knowing when a student
+    # goes looking for the package that does it.
+    "anthropic>=0.110,<1",
+    # LangGraph as the orchestration layer, from W8D1. No langchain-anthropic - every model call
+    # still goes through the Anthropic SDK directly. That is also why token streaming goes through
+    # `stream_mode="custom"` and a writer rather than `stream_mode="messages"`: there is no
+    # LangChain chat model in the stack for the latter to hook into.
+    "langgraph>=1.2,<2",
+    # From W8D2: the file-backed checkpointer. `InMemorySaver` ships inside langgraph itself, but
+    # it cannot outlive the process it is meant to protect against losing. As of W8D3 a
+    # checkpointer is no longer optional at all, since `interrupt()` needs somewhere to record a
+    # pause.
+    "langgraph-checkpoint-sqlite>=3.1,<4",
+    # New for W8D5, and the first dependency added since Tuesday's SQLite saver. The tracing SDK,
+    # and only the SDK: no `opentelemetry-exporter-otlp`, because the day exports to the console and
+    # a local JSONL file and never to a backend. The API package (`opentelemetry-api`) comes along as
+    # a dependency of the SDK. Adding an OTLP exporter later is where a hosted backend would enter,
+    # and it is one more line here plus one more processor in `tracing.build_tracer`.
+    "opentelemetry-sdk>=1.44,<2",
+    "pydantic>=2.9,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

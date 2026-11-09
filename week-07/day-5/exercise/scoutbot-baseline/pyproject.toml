@@ -1,0 +1,20 @@
+[project]
+name = "scoutbot"
+version = "0.3.0"
+description = "W7D5 starting point: Day 4's reference solution (web_fetch/code_execution wired into the Day 2 loop), unchanged"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.110,<1",
+    "pydantic>=2.9,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

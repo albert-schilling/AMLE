@@ -1,0 +1,27 @@
+[project]
+name = "scoutbot"
+version = "0.6.0"
+description = "Reference solution for W8D2: ScoutBot's graph routes on the triage result and survives a process restart via a checkpointer"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.110,<1",
+    # LangGraph as the orchestration layer, from W8D1. No langchain-anthropic - every model call
+    # still goes through the Anthropic SDK directly.
+    "langgraph>=1.2,<2",
+    # New this day, and the only new dependency: the file-backed checkpointer. `InMemorySaver`
+    # ships inside langgraph itself, but it cannot outlive the process it is meant to protect
+    # against losing, so the durability half of the day needs this one.
+    "langgraph-checkpoint-sqlite>=3.1,<4",
+    "pydantic>=2.9,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

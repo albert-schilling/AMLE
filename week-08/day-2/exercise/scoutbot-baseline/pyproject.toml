@@ -1,0 +1,23 @@
+[project]
+name = "scoutbot"
+version = "0.5.0"
+description = "Reference solution for W8D1: ScoutBot's look-up-then-triage sequence as a two-node LangGraph StateGraph with an explicit state schema"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.110,<1",
+    # New this day, and the only new dependency: LangGraph as the orchestration layer. No
+    # langchain-anthropic - every model call still goes through the Anthropic SDK directly.
+    "langgraph>=1.2,<2",
+    "pydantic>=2.9,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

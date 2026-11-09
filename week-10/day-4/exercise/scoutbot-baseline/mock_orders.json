@@ -1,0 +1,28 @@
+{
+  "ORD-1042": {
+    "status": "in_transit",
+    "carrier": "DHL",
+    "tracking_number": "JD0002045871",
+    "estimated_delivery": "2026-08-14",
+    "shipped_on": "2026-08-09"
+  },
+  "ORD-1043": {
+    "status": "delivered",
+    "carrier": "DHL",
+    "tracking_number": "JD0002045872",
+    "estimated_delivery": "2026-08-08",
+    "delivered_on": "2026-08-08"
+  },
+  "ORD-2001": {
+    "status": "processing",
+    "carrier": null,
+    "tracking_number": null,
+    "estimated_delivery": "2026-08-18"
+  },
+  "ORD-2002": {
+    "status": "return_in_progress",
+    "carrier": "Hermes",
+    "tracking_number": "H58120439",
+    "estimated_delivery": null
+  }
+}

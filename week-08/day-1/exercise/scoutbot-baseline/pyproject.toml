@@ -1,0 +1,20 @@
+[project]
+name = "scoutbot"
+version = "0.4.0"
+description = "Reference solution for W7D5: structured JSONL step logging wired into the Day 4 loop"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.110,<1",
+    "pydantic>=2.9,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
