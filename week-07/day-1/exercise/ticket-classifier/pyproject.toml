@@ -1,0 +1,37 @@
+[project]
+name = "ticket-classifier"
+version = "0.1.0"
+description = "Classifies tickets with the help of AI."
+readme = "README.md"
+authors = [
+    { name = "Albert Schilling", email = "albertschilling@gmx.net" }
+]
+requires-python = ">=3.15"
+dependencies = [
+    "anthropic>=2.6.0",
+    "pydantic>=2.14.3",
+    "pydantic-settings>=2.16.2",
+]
+
+[project.scripts]
+ticket-classifier = "ticket_classifier.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-mock>=3.17.0",
+    "ruff>=0.8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+extend-exclude = ["examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
