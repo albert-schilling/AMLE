@@ -1,4 +1,5 @@
 from anthropic import Anthropic
+from pydantic import ValidationError
 
 from .config import get_settings
 from .models import TicketClassification
@@ -10,6 +11,14 @@ SYSTEM_PROMPT = (
     "Priority: high if the customer is blocked, losing money or threatening to "
     "leave; medium if functionality is impaired; low otherwise."
 )
+
+
+CLASSIFY_TOOL = {
+    "name": "classify_ticket",
+    "description": "Record the category and priority of a support ticket.",
+    "strict": True,
+    "input_schema": TicketClassification.model_json_schema(),
+}
 
 
 class ClassificationError(RuntimeError):
@@ -32,19 +41,22 @@ def classify(ticket_text: str, client: Anthropic | None = None) -> TicketClassif
     client = client or create_client()
     settings = get_settings()
 
-    response = client.messages.parse(
+    response = client.messages.create(
         model=settings.model,
         max_tokens=settings.max_tokens,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": create_prompt(ticket_text)}],
-        output_format=TicketClassification,
+        tools=[CLASSIFY_TOOL],
+        tool_choice={"type": "any"},
     )
 
-    classification = response.parsed_output
-
-    if classification is None:
+    tool_use = next((b for b in response.content if b.type == "tool_use"), None)
+    if tool_use is None:
         raise ClassificationError(
-            f"No classification returned (stop_reason={response.stop_reason})"
+            f"Model did not call a tool (stop_reason={response.stop_reason})"
         )
 
-    return classification
+    try:
+        return TicketClassification.model_validate(tool_use.input)
+    except ValidationError as exc:
+        raise ClassificationError(f"Invalid tool arguments: {exc}") from exc
