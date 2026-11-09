@@ -54,3 +54,10 @@ if __name__ == "__main__":
         print("---")
 
 # Works on my machine! There's no repo for this - this script *is* the deployment. — Jonas
+
+# # this "works" as long as the model replies in exactly the format we asked for...
+# category_match = re.search(r"Category:\s*(\w+)", reply)
+# priority_match = re.search(r"Priority:\s*(\w+)", reply)
+# category = category_match.group(1) if category_match else None
+# priority = priority_match.group(1) if priority_match else None
+# return category, priority
