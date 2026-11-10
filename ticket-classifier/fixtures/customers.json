@@ -1,0 +1,33 @@
+{
+  "1001": {
+    "id": "1001",
+    "first_name": "Alice",
+    "last_name": "Smith",
+    "email": "alice@example.com",
+    "products": ["Wendel", "Pip"],
+    "plan": "pro",
+    "account_age_days": 430,
+    "past_refunds_90d": 2
+  },
+  "1002": {
+    "id": "1002",
+    "first_name": "Bob",
+    "last_name": "Johnson",
+    "email": "bob@example.com",
+    "products": ["Brio"],
+    "plan": "free",
+    "account_age_days": 12,
+    "past_refunds_90d": 0
+  },
+  "1003": {
+    "id": "1003",
+    "first_name": "Charlie",
+    "last_name": "Brown",
+    "email": "charlie@example.com",
+    "products": ["Wendel"],
+    "plan": "pro",
+    "account_age_days": 900,
+    "past_refunds_90d": 0
+  }
+}
+

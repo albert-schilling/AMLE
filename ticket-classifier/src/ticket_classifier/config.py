@@ -1,4 +1,6 @@
 from functools import cache
+from pathlib import Path
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,7 +11,9 @@ class Settings(BaseSettings):
 
     anthropic_api_key: SecretStr
     model: str = "claude-haiku-4-5"
-    max_tokens: int = 200
+    max_tokens: int = 1_000
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    customers_path: Path = Path("fixtures/customers.json")
 
 
 @cache
