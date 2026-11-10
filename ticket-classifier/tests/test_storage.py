@@ -30,5 +30,7 @@ def test_save_results_creates_parent_dir(tmp_path):
             "customer_id": None,
             "category": "other",
             "priority": "low",
+            "escalated": False,
+            "escalation_reason": None,
         }
     ]

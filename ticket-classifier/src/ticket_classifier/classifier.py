@@ -1,11 +1,13 @@
 import logging
+from collections.abc import Callable
 
 from anthropic import Anthropic
 
 from .config import get_settings
-from .models import Ticket, TicketClassification
+from .models import Ticket, TicketClassification, TriageResult
 from .prompts import SYSTEM_PROMPT, create_prompt
-from .tools import lookup_customer
+from .tools import lookup_customer, make_escalation_tool
+from .trace import print_final, print_step
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +20,19 @@ def create_client() -> Anthropic:
     return Anthropic(api_key=get_settings().anthropic_api_key.get_secret_value())
 
 
-def classify(ticket: Ticket, client: Anthropic) -> TicketClassification:
-    """Classify a support ticket into category and priority."""
+def classify(
+    ticket: Ticket, client: Anthropic, approve: Callable[[str], bool]
+) -> TriageResult:
+    """Run the agent loop for one ticket and print its reasoning trace.
+
+    The loop (reason, call a tool, observe, repeat) is capped at ``max_iterations``;
+    hitting the cap counts as an automatic escalation. ``approve`` is the human
+    gate for ``escalate_to_human``.
+    """
     settings = get_settings()
+    approved_reasons: list[str] = []
 
     logger.info("Classifying ticket %s", ticket.id)
-    logger.debug("Customer ID: %s", ticket.customer_id)
 
     runner = client.beta.messages.tool_runner(
         model=settings.model,
@@ -31,12 +40,21 @@ def classify(ticket: Ticket, client: Anthropic) -> TicketClassification:
         max_tokens=settings.max_tokens,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": create_prompt(ticket)}],
-        tools=[lookup_customer],
+        tools=[lookup_customer, make_escalation_tool(approve, approved_reasons)],
         output_format=TicketClassification,
     )
 
+    for step, message in enumerate(runner, start=1):
+        # the runner caches this response, so tools run once
+        print_step(step, message, runner.generate_tool_call_response())
+
     final = runner.until_done()
     logger.debug("Ticket %s finished, stop_reason=%s", ticket.id, final.stop_reason)
+
+    if final.stop_reason == "tool_use":  # the model still wanted tools: cap reached
+        reason = f"Iteration cap reached ({settings.max_iterations} steps)"
+        print_final(ticket.id, f"ESCALATED automatically - {reason}")
+        return TriageResult(escalated=True, escalation_reason=reason)
 
     if final.parsed_output is None:
         raise ClassificationError(
@@ -44,4 +62,11 @@ def classify(ticket: Ticket, client: Anthropic) -> TicketClassification:
             f"(stop_reason={final.stop_reason})"
         )
 
-    return final.parsed_output
+    escalated = bool(approved_reasons)
+    result = TriageResult(
+        classification=final.parsed_output,
+        escalated=escalated,
+        escalation_reason=approved_reasons[-1] if escalated else None,
+    )
+    print_final(ticket.id, f"{final.parsed_output}, escalated={escalated}")
+    return result

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from .approval import console_approval
 from .batch import classify_all
 from .classifier import create_client
 from .config import get_settings
@@ -43,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
 
     logger.info("Loaded %d tickets from %s", len(tickets), tickets_path)
 
-    batch = classify_all(tickets, create_client())
+    batch = classify_all(tickets, create_client(), console_approval)
     save_results(batch.classified, settings.results_path)
     logger.info(
         "Classified %d/%d tickets, results in %s",

@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -35,6 +36,56 @@ def _isolated_settings(monkeypatch, tmp_path):
 @pytest.fixture
 def mock_client(mocker):
     return mocker.Mock()
+
+
+class FakeRunner:
+    """Stands in for the SDK tool runner: yields messages, then ends."""
+
+    def __init__(self, messages, observations=None):
+        self.messages = messages
+        self.observations = observations or [None] * len(messages)
+        self._index = -1
+
+    def __iter__(self):
+        for index, message in enumerate(self.messages):
+            self._index = index
+            yield message
+
+    def generate_tool_call_response(self):
+        return self.observations[self._index]
+
+    def until_done(self):
+        return self.messages[-1]
+
+
+def text(content):
+    return SimpleNamespace(type="text", text=content)
+
+
+def tool_use(name, **tool_input):
+    return SimpleNamespace(type="tool_use", name=name, input=tool_input)
+
+
+def message(*blocks, stop_reason="end_turn", parsed_output=None):
+    return SimpleNamespace(
+        content=list(blocks), stop_reason=stop_reason, parsed_output=parsed_output
+    )
+
+
+def observation(content):
+    return {"content": [{"type": "tool_result", "content": content}]}
+
+
+@pytest.fixture
+def runner_returns(mock_client):
+    """Make the fake client return a FakeRunner over the given messages."""
+
+    def _set(messages, observations=None):
+        runner = FakeRunner(messages, observations)
+        mock_client.beta.messages.tool_runner.return_value = runner
+        return runner
+
+    return _set
 
 
 @pytest.fixture
