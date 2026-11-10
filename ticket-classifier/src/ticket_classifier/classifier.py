@@ -7,7 +7,7 @@ from .config import get_settings
 from .models import Ticket, TicketClassification, TriageResult
 from .prompts import SYSTEM_PROMPT, create_prompt
 from .tools import Escalation, lookup_customer, make_escalation_tool
-from .trace import log_final, log_step
+from .trace import log_actions, log_final, log_observations
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +45,9 @@ def classify(
     )
 
     for step, message in enumerate(runner, start=1):
+        log_actions(ticket.id, step, message)  # before tools run (and may prompt)
         # the runner caches this response, so tools run once
-        log_step(ticket.id, step, message, runner.generate_tool_call_response())
+        log_observations(ticket.id, step, runner.generate_tool_call_response())
 
     final = runner.until_done()
     logger.debug("Ticket %s finished, stop_reason=%s", ticket.id, final.stop_reason)

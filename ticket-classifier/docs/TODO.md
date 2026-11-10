@@ -31,6 +31,10 @@ From the critical review of the agent loop.
 
 ## Open decisions / smaller points
 
-- Approval does not end the loop; the model keeps going after "a human will take over".
+- The model may call `lookup_customer` and `escalate_to_human` in the same turn
+  (parallel tool use), so it can escalate before seeing the customer data. Decide whether
+  the prompt or the loop should enforce lookup first.
+- Approval does not end the loop; the model keeps going after "a human will take over" and
+  makes one more API call to classify.
 - `input()` in `console_approval` blocks with no timeout.
 - README says "steps" for `MAX_ITERATIONS`; the SDK counts model replies (same here).

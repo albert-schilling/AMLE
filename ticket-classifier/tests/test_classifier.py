@@ -78,7 +78,7 @@ def test_classify_logs_full_trace(mock_client, runner_returns, make_ticket, capl
                 tool_use("lookup_customer", customer_id="1001"),
                 stop_reason="tool_use",
             ),
-            message(parsed_output=OK),
+            message(text('{"category": "billing"}'), parsed_output=OK),
         ],
         [observation("Alice, pro plan"), None],
     )
@@ -92,6 +92,7 @@ def test_classify_logs_full_trace(mock_client, runner_returns, make_ticket, capl
     assert "Action: lookup_customer({'customer_id': '1001'})" in out
     assert "Observation: Alice, pro plan" in out
     assert "[T-1] step 1" in out
+    assert "step 2 Answer:" in out
     assert "[T-1] Final:" in out
 
 
@@ -111,3 +112,29 @@ def test_classify_reports_approved_escalation(
     assert result.escalated is True
     assert result.escalation_reason == "legal threat"
     assert result.classification == OK
+
+
+def test_classify_logs_action_before_running_tools(
+    mock_client, runner_returns, make_ticket, caplog, mocker
+):
+    runner = runner_returns(
+        [
+            message(tool_use("escalate_to_human", reason="x"), stop_reason="tool_use"),
+            message(parsed_output=OK),
+        ],
+        [observation("approved"), None],
+    )
+    caplog.set_level("INFO", logger="ticket_classifier.trace")
+    seen_when_tools_ran = []
+    original = runner.generate_tool_call_response
+
+    def spy():
+        seen_when_tools_ran.append(caplog.text)
+        return original()
+
+    mocker.patch.object(runner, "generate_tool_call_response", side_effect=spy)
+
+    classify(make_ticket(), mock_client, never)
+
+    assert "Action: escalate_to_human" in seen_when_tools_ran[0]
+    assert "Observation" not in seen_when_tools_ran[0]
