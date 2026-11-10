@@ -18,12 +18,8 @@ def create_client() -> Anthropic:
     return Anthropic(api_key=get_settings().anthropic_api_key.get_secret_value())
 
 
-def classify(ticket: Ticket, client: Anthropic | None = None) -> TicketClassification:
-    """Classify a support ticket into category and priority.
-
-    Pass a ``client`` to reuse a connection (or to inject a fake in tests).
-    """
-    client = client or create_client()
+def classify(ticket: Ticket, client: Anthropic) -> TicketClassification:
+    """Classify a support ticket into category and priority."""
     settings = get_settings()
 
     logger.info("Classifying ticket %s", ticket.id)

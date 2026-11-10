@@ -9,12 +9,12 @@ from .models import Customer
 
 
 @cache
-def _load(path: Path) -> dict[str, dict]:
+def load_customers(path: Path) -> dict[str, dict]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def clear_cache() -> None:
-    _load.cache_clear()
+    load_customers.cache_clear()
 
 
 def get_customer(customer_id: str) -> Customer | None:
@@ -22,5 +22,5 @@ def get_customer(customer_id: str) -> Customer | None:
 
     Raises ``pydantic.ValidationError`` if the stored record is malformed.
     """
-    record = _load(get_settings().customers_path).get(customer_id)
+    record = load_customers(get_settings().customers_path).get(customer_id)
     return None if record is None else Customer.model_validate(record)

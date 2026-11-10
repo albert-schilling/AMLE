@@ -10,7 +10,8 @@ def test_classify_all_collects_results(mocker, make_ticket, mock_client):
     mocker.patch("ticket_classifier.batch.classify", return_value=OK)
 
     batch = classify_all(
-        [make_ticket(id="T-1"), make_ticket(customer_id=None, id="T-2")], mock_client
+        [make_ticket(id="T-1"), make_ticket(customer_id=None, id="T-2")],
+        mock_client,
     )
 
     assert [(r.ticket_id, r.customer_id) for r in batch.classified] == [

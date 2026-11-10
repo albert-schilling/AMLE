@@ -20,7 +20,7 @@ def classify_all(tickets: list[Ticket], client: Anthropic) -> BatchResult:
     batch = BatchResult()
     for ticket in tickets:
         try:
-            result = classify(ticket, client=client)
+            result = classify(ticket, client)
         except (ClassificationError, APIError) as error:
             batch.failed.append(ticket.id)
             logger.error("Ticket %s failed: %s", ticket.id, error)
