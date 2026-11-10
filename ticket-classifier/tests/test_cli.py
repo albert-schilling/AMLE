@@ -37,6 +37,8 @@ def test_main_writes_results(mocker, write_tickets, results_file):
             "customer_id": "1001",
             "category": "billing",
             "priority": "high",
+            "escalated": False,
+            "escalation_reason": None,
         }
     ]
 

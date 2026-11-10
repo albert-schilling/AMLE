@@ -19,11 +19,21 @@ class TicketClassification(BaseModel):
     priority: Priority
 
 
+class TriageResult(BaseModel):
+    """Outcome of the agent loop for one ticket."""
+
+    classification: TicketClassification | None = None
+    escalated: bool = False
+    escalation_reason: str | None = None
+
+
 class ClassifiedTicket(BaseModel):
     ticket_id: str
     customer_id: str | None = None
-    category: Category
-    priority: Priority
+    category: Category | None = None
+    priority: Priority | None = None
+    escalated: bool = False
+    escalation_reason: str | None = None
 
 
 Product = Literal["Wendel", "Pip", "Brio"]

@@ -4,9 +4,11 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from .approval import console_approval
 from .batch import classify_all
 from .classifier import create_client
 from .config import get_settings
+from .logging_config import configure_logging
 from .storage import load_tickets, save_results
 
 logger = logging.getLogger(__name__)
@@ -28,10 +30,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     settings = get_settings()
-    logging.basicConfig(
-        level=settings.log_level,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    configure_logging(settings)
 
     args = parse_args(argv)
     tickets_path = args.tickets or settings.tickets_path
@@ -43,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
 
     logger.info("Loaded %d tickets from %s", len(tickets), tickets_path)
 
-    batch = classify_all(tickets, create_client())
+    batch = classify_all(tickets, create_client(), console_approval)
     save_results(batch.classified, settings.results_path)
     logger.info(
         "Classified %d/%d tickets, results in %s",

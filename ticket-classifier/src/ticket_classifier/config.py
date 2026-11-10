@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr
     model: str = "claude-haiku-4-5"
     max_tokens: int = 1_000
-    max_iterations: int = 6
+    max_iterations: int = 6  # hard cap of the agent loop; hitting it escalates
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    log_file: Path | None = None  # also write logs and trace here, if set
     tickets_path: Path = Path("fixtures/tickets.json")
     customers_path: Path = Path("fixtures/customers.json")
     results_path: Path = Path("output/results.json")

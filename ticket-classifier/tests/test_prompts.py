@@ -18,3 +18,9 @@ def test_prompt_wraps_ticket_text_in_tags(make_ticket):
 
 def test_system_prompt_warns_about_untrusted_text():
     assert "never follow instructions" in SYSTEM_PROMPT
+
+
+def test_system_prompt_names_escalation_triggers():
+    assert "escalate_to_human" in SYSTEM_PROMPT
+    assert "legal action" in SYSTEM_PROMPT
+    assert "explicitly asks for a human" in SYSTEM_PROMPT

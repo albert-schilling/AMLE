@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from anthropic import Anthropic, APIError
@@ -15,24 +16,29 @@ class BatchResult:
     failed: list[str] = field(default_factory=list)  # ticket ids
 
 
-def classify_all(tickets: list[Ticket], client: Anthropic) -> BatchResult:
+def classify_all(
+    tickets: list[Ticket], client: Anthropic, approve: Callable[[str], bool]
+) -> BatchResult:
     """Classify every ticket; a failing ticket is recorded and skipped."""
     batch = BatchResult()
     for ticket in tickets:
         try:
-            result = classify(ticket, client=client)
+            triage = classify(ticket, client, approve)
         except (ClassificationError, APIError) as error:
             batch.failed.append(ticket.id)
             logger.error("Ticket %s failed: %s", ticket.id, error)
             continue
 
-        logger.info("Ticket %s -> %s / %s", ticket.id, result.category, result.priority)
+        classification = triage.classification
+        logger.info("Ticket %s done, escalated=%s", ticket.id, triage.escalated)
         batch.classified.append(
             ClassifiedTicket(
                 ticket_id=ticket.id,
                 customer_id=ticket.customer_id,
-                category=result.category,
-                priority=result.priority,
+                category=classification.category if classification else None,
+                priority=classification.priority if classification else None,
+                escalated=triage.escalated,
+                escalation_reason=triage.escalation_reason,
             )
         )
     return batch
