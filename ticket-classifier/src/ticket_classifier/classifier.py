@@ -6,7 +6,7 @@ from anthropic import Anthropic
 from .config import get_settings
 from .models import Ticket, TicketClassification, TriageResult
 from .prompts import SYSTEM_PROMPT, create_prompt
-from .tools import lookup_customer, make_escalation_tool
+from .tools import Escalation, lookup_customer, make_escalation_tool
 from .trace import log_final, log_step
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def classify(
     gate for ``escalate_to_human``.
     """
     settings = get_settings()
-    approved_reasons: list[str] = []
+    escalation = Escalation(approve)
 
     logger.info("Classifying ticket %s", ticket.id)
 
@@ -40,7 +40,7 @@ def classify(
         max_tokens=settings.max_tokens,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": create_prompt(ticket)}],
-        tools=[lookup_customer, make_escalation_tool(approve, approved_reasons)],
+        tools=[lookup_customer, make_escalation_tool(escalation)],
         output_format=TicketClassification,
     )
 
@@ -62,11 +62,11 @@ def classify(
             f"(stop_reason={final.stop_reason})"
         )
 
-    escalated = bool(approved_reasons)
+    escalated = escalation.reason is not None
     result = TriageResult(
         classification=final.parsed_output,
         escalated=escalated,
-        escalation_reason=approved_reasons[-1] if escalated else None,
+        escalation_reason=escalation.reason,
     )
     log_final(ticket.id, f"{final.parsed_output}, escalated={escalated}")
     return result

@@ -1,6 +1,6 @@
 import json
 
-from ticket_classifier.tools import lookup_customer, make_escalation_tool
+from ticket_classifier.tools import Escalation, lookup_customer, make_escalation_tool
 
 
 def test_lookup_customer_found(customers_file):
@@ -24,20 +24,38 @@ def test_lookup_customer_malformed_record(customers_file):
 
 
 def test_escalation_needs_approval_before_it_counts():
-    approved = []
-    tool = make_escalation_tool(lambda reason: True, approved)
+    escalation = Escalation(lambda reason: True)
+    tool = make_escalation_tool(escalation)
 
     result = tool.call({"reason": "legal threat"})
 
-    assert approved == ["legal threat"]
+    assert escalation.reason == "legal threat"
     assert "approved" in result
 
 
 def test_rejected_escalation_is_an_observation_not_an_effect():
-    approved = []
-    tool = make_escalation_tool(lambda reason: False, approved)
+    escalation = Escalation(lambda reason: False)
+    tool = make_escalation_tool(escalation)
 
     result = tool.call({"reason": "legal threat"})
 
-    assert approved == []
+    assert escalation.reason is None
     assert "rejected" in result
+
+
+def test_second_escalation_does_not_ask_the_human_again():
+    asked = []
+
+    def approve(reason):
+        asked.append(reason)
+        return True
+
+    escalation = Escalation(approve)
+    tool = make_escalation_tool(escalation)
+
+    tool.call({"reason": "first"})
+    result = tool.call({"reason": "second"})
+
+    assert asked == ["first"]
+    assert escalation.reason == "first"
+    assert "Already escalated" in result

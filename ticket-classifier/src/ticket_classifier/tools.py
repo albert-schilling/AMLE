@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from anthropic import beta_tool
@@ -29,22 +30,30 @@ def lookup_customer(customer_id: str) -> str:
     return customer.model_dump_json()
 
 
-def make_escalation_tool(
-    approve: Callable[[str], bool], approved_reasons: list[str]
-) -> BetaFunctionTool[Any]:
-    """Build ``escalate_to_human``. It only counts once ``approve`` says yes.
+@dataclass
+class Escalation:
+    """Human gate and outcome of ``escalate_to_human`` for one ticket."""
 
-    Approved reasons are appended to ``approved_reasons``; a rejection is returned
-    to the model as a normal observation so the loop continues.
+    approve: Callable[[str], bool]
+    reason: str | None = None  # set once a human approved
+
+
+def make_escalation_tool(escalation: Escalation) -> BetaFunctionTool[Any]:
+    """Build ``escalate_to_human``. It only counts once a human approves.
+
+    A rejection is returned to the model as a normal observation so the loop
+    continues. After an approval, further calls are answered without asking again.
     """
 
     @beta_tool
     def escalate_to_human(reason: str) -> str:
         """Hand the ticket to a human agent. Needs approval and may be rejected."""
         logger.info("Escalation requested: %s", reason)
-        if not approve(reason):
+        if escalation.reason is not None:
+            return "Already escalated. A human will take over this ticket."
+        if not escalation.approve(reason):
             return "Escalation rejected by the human. Continue without escalating."
-        approved_reasons.append(reason)
+        escalation.reason = reason
         return "Escalation approved. A human will take over this ticket."
 
     return escalate_to_human
