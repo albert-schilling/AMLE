@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from ticket_classifier.config import Settings
-from ticket_classifier.logging_config import configure_logging
+from ticket_classifier.logging_config import QUIET_LOGGERS, configure_logging
 from ticket_classifier.trace import TRACE_LOGGER_NAME, trace_logger
 
 
@@ -50,3 +50,12 @@ def test_configure_logging_twice_adds_no_duplicate_handlers():
 
     assert len(ours(trace_logger)) == 1
     assert len(ours(logging.getLogger())) == 1
+
+
+def test_sdk_and_http_loggers_stay_at_info_even_on_debug(monkeypatch):
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    configure_logging(Settings())
+
+    assert logging.getLogger().level == logging.DEBUG
+    for name in QUIET_LOGGERS:
+        assert logging.getLogger(name).level == logging.INFO

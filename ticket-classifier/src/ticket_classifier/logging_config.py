@@ -5,6 +5,7 @@ from .config import Settings
 from .trace import TRACE_LOGGER_NAME
 
 HANDLER_NAME = "ticket_classifier"
+QUIET_LOGGERS = ("anthropic", "httpx", "httpcore", "httpx2", "httpcore2")
 FULL_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 
@@ -22,6 +23,8 @@ def configure_logging(settings: Settings) -> None:
                 handler.close()
 
     root.setLevel(settings.log_level)
+    for name in QUIET_LOGGERS:
+        logging.getLogger(name).setLevel(logging.INFO)
     console = logging.StreamHandler()
     console.setFormatter(logging.Formatter(FULL_FORMAT))
     console.set_name(HANDLER_NAME)
