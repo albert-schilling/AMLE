@@ -19,6 +19,13 @@ class TicketClassification(BaseModel):
     priority: Priority
 
 
+class ClassifiedTicket(BaseModel):
+    ticket_id: str
+    customer_id: str | None = None
+    category: Category
+    priority: Priority
+
+
 Product = Literal["Wendel", "Pip", "Brio"]
 
 

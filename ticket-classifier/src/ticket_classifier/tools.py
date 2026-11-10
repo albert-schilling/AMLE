@@ -1,24 +1,26 @@
-import json
 import logging
 
 from anthropic import beta_tool
+from pydantic import ValidationError
 
-from .config import get_settings
-from .models import Customer
+from .customers import get_customer
 
 logger = logging.getLogger(__name__)
 
 
 @beta_tool
 def lookup_customer(customer_id: str) -> str:
-    """Look up a customer by id. Returns customer JSON or 'Customer not found'."""
+    """Look up a customer by id. Returns customer JSON or an error message."""
     logger.info("Looking up customer %s", customer_id)
 
-    customers = json.loads(get_settings().customers_path.read_text(encoding="utf-8"))
-    customer = customers.get(customer_id)
+    try:
+        customer = get_customer(customer_id)
+    except ValidationError:
+        logger.exception("Customer record %s is malformed", customer_id)
+        return "Customer record unavailable"
 
     if customer is None:
         logger.warning("Customer %s not found", customer_id)
         return "Customer not found"
 
-    return Customer(**customer).model_dump_json()
+    return customer.model_dump_json()

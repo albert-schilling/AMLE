@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 # .PHONY tells Make that these targets are commands, not actual files on disk
-.PHONY: format setup test run help
+.PHONY: format lint setup test run help
 
 # The default target that runs if you just type 'make'
 help:
@@ -10,6 +10,7 @@ help:
 	@echo "  make setup   - Install dependencies and prepare the project"
 	@echo "  make test    - Run the project test suite"
 	@echo "  make format  - Format the code using ruff"
+	@echo "  make lint    - Lint the code using ruff"
 	@echo "  make run     - Run the classifier script"
 
 setup:
@@ -20,6 +21,9 @@ test:
 
 format:
 	uv run ruff format
+
+lint:
+	uv run ruff check
 
 run:
 	@echo "REQUIREMENT: Anthropic API Key in the environment"

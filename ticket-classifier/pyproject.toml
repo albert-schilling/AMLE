@@ -30,8 +30,5 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-[tool.ruff]
-extend-exclude = ["examples"]
-
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

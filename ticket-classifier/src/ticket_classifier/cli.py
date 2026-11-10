@@ -1,13 +1,13 @@
 import argparse
-import json
 import logging
 from pathlib import Path
 
-from pydantic import TypeAdapter
+from pydantic import ValidationError
 
-from .classifier import ClassificationError, classify, create_client
+from .batch import classify_all
+from .classifier import create_client
 from .config import get_settings
-from .models import Ticket
+from .storage import load_tickets, save_results
 
 logger = logging.getLogger(__name__)
 
@@ -27,48 +27,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    settings = get_settings()
     logging.basicConfig(
-        level=get_settings().log_level.upper(),
+        level=settings.log_level,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
     args = parse_args(argv)
-    tickets_path = args.tickets or get_settings().tickets_path
-    tickets = TypeAdapter(list[Ticket]).validate_json(
-        tickets_path.read_text(encoding="utf-8")
-    )
+    tickets_path = args.tickets or settings.tickets_path
+    try:
+        tickets = load_tickets(tickets_path)
+    except (OSError, ValidationError) as error:
+        logger.error("Cannot load tickets from %s: %s", tickets_path, error)
+        return 2
 
     logger.info("Loaded %d tickets from %s", len(tickets), tickets_path)
 
-    client = create_client()
-    results = []
-    failures = 0
-    for ticket in tickets:
-        try:
-            result = classify(ticket, client=client)
-        except ClassificationError as error:
-            failures += 1
-            logger.error("Ticket %s failed: %s", ticket.id, error)
-            continue
-
-        logger.info("Ticket %s -> %s / %s", ticket.id, result.category, result.priority)
-        results.append(
-            {
-                "ticket_id": ticket.id,
-                "customer_id": ticket.customer_id,
-                "category": result.category,
-                "priority": result.priority,
-            }
-        )
-
-    results_path = get_settings().results_path
-    results_path.parent.mkdir(parents=True, exist_ok=True)
-    results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    batch = classify_all(tickets, create_client())
+    save_results(batch.classified, settings.results_path)
     logger.info(
         "Classified %d/%d tickets, results in %s",
-        len(results),
+        len(batch.classified),
         len(tickets),
-        results_path,
+        settings.results_path,
     )
 
-    return 1 if failures else 0
+    return 1 if batch.failed else 0

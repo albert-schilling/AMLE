@@ -12,10 +12,11 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr
     model: str = "claude-haiku-4-5"
     max_tokens: int = 1_000
+    max_iterations: int = 6
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     tickets_path: Path = Path("fixtures/tickets.json")
     customers_path: Path = Path("fixtures/customers.json")
-    results_path: Path = Path("fixtures/results.json")
+    results_path: Path = Path("output/results.json")
 
 
 @cache

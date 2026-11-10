@@ -4,33 +4,14 @@ from anthropic import Anthropic
 
 from .config import get_settings
 from .models import Ticket, TicketClassification
+from .prompts import SYSTEM_PROMPT, create_prompt
 from .tools import lookup_customer
-
-SYSTEM_PROMPT = (
-    "You are a support ticket triage assistant. "
-    "Categories: billing (charges, refunds, invoices), technical (bugs, errors, "
-    "outages), account (profile, login, settings), other. "
-    "Priority: high if the customer is blocked, losing money or threatening to "
-    "leave; medium if functionality is impaired; low otherwise. "
-    "If a customer id is given, call lookup_customer first and use the result. "
-    "If none is given, don't call it."
-)
-
 
 logger = logging.getLogger(__name__)
 
 
 class ClassificationError(RuntimeError):
     """The model did not return a usable classification."""
-
-
-def create_prompt(ticket: Ticket) -> str:
-    if ticket.customer_id is not None:
-        return (
-            f"Classify the following ticket:\n{ticket}"
-            + f"\nCustomer ID: {ticket.customer_id}"
-        )
-    return f"Classify the following ticket:\n{ticket}"
 
 
 def create_client() -> Anthropic:
@@ -50,7 +31,7 @@ def classify(ticket: Ticket, client: Anthropic | None = None) -> TicketClassific
 
     runner = client.beta.messages.tool_runner(
         model=settings.model,
-        max_iterations=6,
+        max_iterations=settings.max_iterations,
         max_tokens=settings.max_tokens,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": create_prompt(ticket)}],
