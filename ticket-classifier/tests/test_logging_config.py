@@ -48,8 +48,5 @@ def test_configure_logging_twice_adds_no_duplicate_handlers():
     configure_logging(Settings())
     configure_logging(Settings())
 
-    assert len(trace_logger.handlers) == 1
-    ours = [
-        h for h in logging.getLogger().handlers if h.get_name() == "ticket_classifier"
-    ]
-    assert len(ours) == 1
+    assert len(ours(trace_logger)) == 1
+    assert len(ours(logging.getLogger())) == 1
