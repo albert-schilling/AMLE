@@ -47,7 +47,7 @@ def classify(ticket_text: str, client: Anthropic | None = None) -> TicketClassif
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": create_prompt(ticket_text)}],
         tools=[CLASSIFY_TOOL],
-        tool_choice={"type": "any"},
+        tool_choice={"type": "tool", "name": "classify_ticket"}
     )
 
     tool_use = next((b for b in response.content if b.type == "tool_use"), None)
