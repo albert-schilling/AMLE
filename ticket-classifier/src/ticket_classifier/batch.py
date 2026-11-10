@@ -29,14 +29,14 @@ def classify_all(
             logger.error("Ticket %s failed: %s", ticket.id, error)
             continue
 
-        result = triage.classification
+        classification = triage.classification
         logger.info("Ticket %s done, escalated=%s", ticket.id, triage.escalated)
         batch.classified.append(
             ClassifiedTicket(
                 ticket_id=ticket.id,
                 customer_id=ticket.customer_id,
-                category=result.category if result else None,
-                priority=result.priority if result else None,
+                category=classification.category if classification else None,
+                priority=classification.priority if classification else None,
                 escalated=triage.escalated,
                 escalation_reason=triage.escalation_reason,
             )

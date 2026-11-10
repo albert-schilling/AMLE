@@ -9,7 +9,9 @@ the model looks the customer up (tool use) before deciding.
 Per ticket the model runs a capped loop: reason, call a tool, observe, repeat, until
 it gives a final answer. Tools: `lookup_customer` (read-only) and `escalate_to_human`.
 
-- Every Thought, Action and Observation is printed, followed by the final answer.
+- Every Thought, Action and Observation is logged (logger `ticket_classifier.trace`,
+  plain format on the console), followed by the final answer. Set `LOG_FILE` to also
+  write it, with timestamps, to a file.
 - `escalate_to_human` only counts after a human types `y` at the console prompt. A
   rejection goes back to the model as a normal observation and the loop continues.
 - The loop is capped at `MAX_ITERATIONS` (default 6). Hitting the cap escalates the
@@ -46,7 +48,7 @@ Customers are read from `CUSTOMERS_PATH` (JSON object keyed by customer id).
 
 Environment variables or `.env`, see [.env.example](.env.example):
 `ANTHROPIC_API_KEY` (required), `MODEL`, `MAX_TOKENS`, `MAX_ITERATIONS`, `LOG_LEVEL`,
-`TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`.
+`LOG_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`.
 
 ## Layout
 
@@ -56,7 +58,7 @@ Environment variables or `.env`, see [.env.example](.env.example):
 | `batch.py` | classify many tickets, collect failures |
 | `classifier.py` | one ticket → Claude tool runner → classification |
 | `prompts.py` | system and user prompts |
-| `approval.py`, `trace.py` | human approval prompt, trace printing |
+| `approval.py`, `trace.py`, `logging_config.py` | human approval prompt, trace logging, logger setup |
 | `tools.py` | tools the model can call |
 | `customers.py` | customer data access (swap for a DB later) |
 | `storage.py` | read tickets, write results |

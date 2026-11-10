@@ -70,7 +70,7 @@ def test_classify_escalates_automatically_when_cap_is_hit(
     assert "Iteration cap" in result.escalation_reason
 
 
-def test_classify_prints_full_trace(mock_client, runner_returns, make_ticket, capsys):
+def test_classify_logs_full_trace(mock_client, runner_returns, make_ticket, caplog):
     runner_returns(
         [
             message(
@@ -83,13 +83,16 @@ def test_classify_prints_full_trace(mock_client, runner_returns, make_ticket, ca
         [observation("Alice, pro plan"), None],
     )
 
+    caplog.set_level("INFO", logger="ticket_classifier.trace")
+
     classify(make_ticket(), mock_client, never)
 
-    out = capsys.readouterr().out
+    out = caplog.text
     assert "Thought: Need the customer." in out
     assert "Action: lookup_customer({'customer_id': '1001'})" in out
     assert "Observation: Alice, pro plan" in out
-    assert "T-1" in out
+    assert "[T-1] step 1" in out
+    assert "[T-1] Final:" in out
 
 
 def test_classify_reports_approved_escalation(
