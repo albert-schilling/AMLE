@@ -9,8 +9,6 @@ from .classifier import ClassificationError, classify, create_client
 from .config import get_settings
 from .models import Ticket
 
-DEFAULT_TICKETS = Path("fixtures/tickets.json")
-
 logger = logging.getLogger(__name__)
 
 
@@ -22,8 +20,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "tickets",
         nargs="?",
         type=Path,
-        default=DEFAULT_TICKETS,
-        help=f"JSON file with tickets (default: {DEFAULT_TICKETS})",
+        default=None,
+        help="JSON file with tickets (default: TICKETS_PATH setting)",
     )
     return parser.parse_args(argv)
 
@@ -35,26 +33,25 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = parse_args(argv)
+    tickets_path = args.tickets or get_settings().tickets_path
     tickets = TypeAdapter(list[Ticket]).validate_json(
-        args.tickets.read_text(encoding="utf-8")
+        tickets_path.read_text(encoding="utf-8")
     )
 
+    logger.info("Loaded %d tickets from %s", len(tickets), tickets_path)
+
     client = create_client()
+    results = []
     failures = 0
     for ticket in tickets:
         try:
             result = classify(ticket, client=client)
         except ClassificationError as error:
             failures += 1
-            logger.error("%s: %s", ticket.id, error)
+            logger.error("Ticket %s failed: %s", ticket.id, error)
             continue
 
-        # Write results in fixtures/results.json
-        results_path = Path("fixtures/results.json")
-        if results_path.exists():
-            results = json.loads(results_path.read_text(encoding="utf-8"))
-        else:
-            results = []
+        logger.info("Ticket %s -> %s / %s", ticket.id, result.category, result.priority)
         results.append(
             {
                 "ticket_id": ticket.id,
@@ -63,6 +60,15 @@ def main(argv: list[str] | None = None) -> int:
                 "priority": result.priority,
             }
         )
-        results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+
+    results_path = get_settings().results_path
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    logger.info(
+        "Classified %d/%d tickets, results in %s",
+        len(results),
+        len(tickets),
+        results_path,
+    )
 
     return 1 if failures else 0

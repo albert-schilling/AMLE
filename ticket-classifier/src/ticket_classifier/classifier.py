@@ -59,8 +59,12 @@ def classify(ticket: Ticket, client: Anthropic | None = None) -> TicketClassific
     )
 
     final = runner.until_done()
+    logger.debug("Ticket %s finished, stop_reason=%s", ticket.id, final.stop_reason)
 
     if final.parsed_output is None:
-        raise ClassificationError(f"Failed to classify ticket with ID: {ticket.id}")
+        raise ClassificationError(
+            f"No parsed classification for ticket {ticket.id} "
+            f"(stop_reason={final.stop_reason})"
+        )
 
     return final.parsed_output
