@@ -3,7 +3,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from ticket_classifier.models import ClassifiedTicket
+from ticket_classifier.models import ResolvedTicket
 from ticket_classifier.storage import load_tickets, save_results
 
 
@@ -22,7 +22,7 @@ def test_load_tickets_invalid_json(tmp_path):
 def test_save_results_creates_parent_dir(tmp_path):
     path = tmp_path / "nested" / "results.json"
     save_results(
-        [ClassifiedTicket(ticket_id="T-1", category="other", priority="low")], path
+        [ResolvedTicket(ticket_id="T-1", category="other", priority="low")], path
     )
     assert json.loads(path.read_text()) == [
         {

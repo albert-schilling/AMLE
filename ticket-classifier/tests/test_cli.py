@@ -2,11 +2,11 @@ import json
 
 from ticket_classifier.batch import BatchResult
 from ticket_classifier.cli import main
-from ticket_classifier.models import ClassifiedTicket
+from ticket_classifier.models import ResolvedTicket
 
 
 def classified(ticket_id):
-    return ClassifiedTicket(ticket_id=ticket_id, category="other", priority="low")
+    return ResolvedTicket(ticket_id=ticket_id, category="other", priority="low")
 
 
 def patch_pipeline(mocker, batch):
@@ -20,7 +20,7 @@ def test_main_writes_results(mocker, write_tickets, results_file):
         mocker,
         BatchResult(
             classified=[
-                ClassifiedTicket(
+                ResolvedTicket(
                     ticket_id="T-1",
                     customer_id="1001",
                     category="billing",

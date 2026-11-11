@@ -17,9 +17,6 @@ bottom so the history stays clear.
 
 ## Design
 
-3. **`TriageResult` / `ClassifiedTicket` allow impossible states** (`escalated=False` with
-   a reason; no classification and no escalation). Add a validator or a tagged union.
-   `category: null` in the output file must be handled by consumers.
 4. **`classify` has too many jobs** (build request, thinking options, drive loop, log,
    interpret outcome). Split "run loop" from "turn messages into a result" so the cap
    logic is testable alone.

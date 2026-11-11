@@ -5,7 +5,14 @@ from dataclasses import dataclass, field
 from anthropic import Anthropic, APIError
 
 from .classifier import ClassificationError, classify
-from .models import ClassifiedTicket, Ticket
+from .models import (
+    ClassifiedTicket,
+    Escalated,
+    EscalatedTicket,
+    ResolvedTicket,
+    Ticket,
+    TriageResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +21,26 @@ logger = logging.getLogger(__name__)
 class BatchResult:
     classified: list[ClassifiedTicket] = field(default_factory=list)
     failed: list[str] = field(default_factory=list)  # ticket ids
+
+
+def to_classified_ticket(ticket: Ticket, triage: TriageResult) -> ClassifiedTicket:
+    classification = triage.classification
+    category = classification.category if classification else None
+    priority = classification.priority if classification else None
+    if isinstance(triage, Escalated):
+        return EscalatedTicket(
+            ticket_id=ticket.id,
+            customer_id=ticket.customer_id,
+            category=category,
+            priority=priority,
+            escalation_reason=triage.escalation_reason,
+        )
+    return ResolvedTicket(
+        ticket_id=ticket.id,
+        customer_id=ticket.customer_id,
+        category=triage.classification.category,
+        priority=triage.classification.priority,
+    )
 
 
 def classify_all(
@@ -29,16 +56,6 @@ def classify_all(
             logger.error("Ticket %s failed: %s", ticket.id, error)
             continue
 
-        classification = triage.classification
         logger.info("Ticket %s done, escalated=%s", ticket.id, triage.escalated)
-        batch.classified.append(
-            ClassifiedTicket(
-                ticket_id=ticket.id,
-                customer_id=ticket.customer_id,
-                category=classification.category if classification else None,
-                priority=classification.priority if classification else None,
-                escalated=triage.escalated,
-                escalation_reason=triage.escalation_reason,
-            )
-        )
+        batch.classified.append(to_classified_ticket(ticket, triage))
     return batch

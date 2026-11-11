@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 Category = Literal["billing", "technical", "account", "other"]
 Priority = Literal["low", "medium", "high"]
@@ -19,21 +19,46 @@ class TicketClassification(BaseModel):
     priority: Priority
 
 
-class TriageResult(BaseModel):
-    """Outcome of the agent loop for one ticket."""
+class Resolved(BaseModel):
+    """Triage ended with a classification and no escalation."""
 
+    escalated: Literal[False] = False
+    classification: TicketClassification
+
+
+class Escalated(BaseModel):
+    """Triage ended with a human takeover; a classification may still exist."""
+
+    escalated: Literal[True] = True
+    escalation_reason: str
     classification: TicketClassification | None = None
-    escalated: bool = False
-    escalation_reason: str | None = None
 
 
-class ClassifiedTicket(BaseModel):
+# Tagged union on ``escalated``: impossible states cannot be built or loaded.
+TriageResult = Annotated[Resolved | Escalated, Field(discriminator="escalated")]
+
+
+class ResolvedTicket(BaseModel):
     ticket_id: str
     customer_id: str | None = None
-    category: Category | None = None
+    category: Category
+    priority: Priority
+    escalated: Literal[False] = False
+    escalation_reason: None = None
+
+
+class EscalatedTicket(BaseModel):
+    ticket_id: str
+    customer_id: str | None = None
+    category: Category | None = None  # absent when escalated without a classification
     priority: Priority | None = None
-    escalated: bool = False
-    escalation_reason: str | None = None
+    escalated: Literal[True] = True
+    escalation_reason: str
+
+
+ClassifiedTicket = Annotated[
+    ResolvedTicket | EscalatedTicket, Field(discriminator="escalated")
+]
 
 
 Product = Literal["Wendel", "Pip", "Brio"]

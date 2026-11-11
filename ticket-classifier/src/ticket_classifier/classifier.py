@@ -4,7 +4,7 @@ from collections.abc import Callable
 from anthropic import Anthropic
 
 from .config import get_settings
-from .models import Ticket, TicketClassification, TriageResult
+from .models import Escalated, Resolved, Ticket, TicketClassification
 from .prompts import SYSTEM_PROMPT, create_prompt
 from .tools import Escalation, lookup_customer, make_escalation_tool
 from .trace import log_actions, log_final, log_observations
@@ -22,7 +22,7 @@ def create_client() -> Anthropic:
 
 def classify(
     ticket: Ticket, client: Anthropic, approve: Callable[[str], bool]
-) -> TriageResult:
+) -> Resolved | Escalated:
     """Run the agent loop for one ticket and log its reasoning trace.
 
     The loop (reason, call a tool, observe, repeat) is capped at ``max_iterations``;
@@ -69,7 +69,7 @@ def classify(
     if final.stop_reason == "tool_use":  # the model still wanted tools: cap reached
         reason = f"Iteration cap reached ({settings.max_iterations} steps)"
         log_final(ticket.id, f"ESCALATED automatically - {reason}")
-        return TriageResult(escalated=True, escalation_reason=reason)
+        return Escalated(escalation_reason=reason)
 
     if final.parsed_output is None:
         raise ClassificationError(
@@ -77,11 +77,12 @@ def classify(
             f"(stop_reason={final.stop_reason})"
         )
 
-    escalated = escalation.reason is not None
-    result = TriageResult(
-        classification=final.parsed_output,
-        escalated=escalated,
-        escalation_reason=escalation.reason,
-    )
-    log_final(ticket.id, f"{final.parsed_output}, escalated={escalated}")
+    result: Resolved | Escalated
+    if escalation.reason is not None:
+        result = Escalated(
+            escalation_reason=escalation.reason, classification=final.parsed_output
+        )
+    else:
+        result = Resolved(classification=final.parsed_output)
+    log_final(ticket.id, f"{final.parsed_output}, escalated={result.escalated}")
     return result

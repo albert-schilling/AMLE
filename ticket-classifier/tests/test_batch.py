@@ -2,11 +2,9 @@ import anthropic
 
 from ticket_classifier import ClassificationError, TicketClassification
 from ticket_classifier.batch import classify_all
-from ticket_classifier.models import TriageResult
+from ticket_classifier.models import Escalated, Resolved
 
-OK = TriageResult(
-    classification=TicketClassification(category="billing", priority="high")
-)
+OK = Resolved(classification=TicketClassification(category="billing", priority="high"))
 
 
 def never(reason):
@@ -58,7 +56,7 @@ def test_classify_all_skips_api_errors(mocker, make_ticket, mock_client):
 
 
 def test_classify_all_records_escalation(mocker, make_ticket, mock_client):
-    escalated = TriageResult(escalated=True, escalation_reason="cap")
+    escalated = Escalated(escalation_reason="cap")
     mocker.patch("ticket_classifier.batch.classify", return_value=escalated)
 
     batch = classify_all([make_ticket()], mock_client, never)
