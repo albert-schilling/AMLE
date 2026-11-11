@@ -34,6 +34,7 @@ cp .env.example .env            # then set ANTHROPIC_API_KEY
 ```sh
 make run                        # uses TICKETS_PATH
 uv run ticket-classifier path/to/tickets.json
+uv run python -m ticket_classifier   # same program, without the console script
 ```
 
 Calls the Anthropic API and may incur charges. The run is interactive: if the model

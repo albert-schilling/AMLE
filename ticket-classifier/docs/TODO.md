@@ -26,10 +26,17 @@ bottom so the history stays clear.
 
 ## Open decisions / smaller points
 
-- **Thinking only appears at step 1**, not after tool results. Check whether Haiku 4.5
-  needs the interleaved-thinking beta header, or whether nothing is thought there.
 - **One tool call per turn** (`disable_parallel_tool_use`) was added but not yet checked
   in a real run: expect lookup first, then escalation, in separate steps.
+- **`THINKING_BUDGET` only works for models with manual extended thinking** (e.g. Haiku
+  4.5). Claude 4.7 and later (e.g. `claude-haiku-5-5`) reject `type: "enabled"` with a
+  400; they need `{"type": "adaptive"}` plus an effort level. If `MODEL` is switched,
+  thinking must change too. Consider a startup check or warning, or a setting that
+  selects the mode.
+- **No temperature / sampling control:** API version `2026-10-21` (the SDK default)
+  rejects `temperature`, `top_p` and `top_k` on every model, and older versions forbid
+  them with thinking on. Run-to-run variation can only be reduced by prompt, thinking, or
+  voting (run twice, escalate on disagreement).
 - Approval does not end the loop; the model keeps going after "a human will take over" and
   makes one more API call to classify.
 - `input()` in `console_approval` blocks with no timeout.
@@ -40,6 +47,8 @@ bottom so the history stays clear.
 
 ## Done
 
+- Thinking only at step 1: explained, not a bug. Haiku 4.5 has no interleaved thinking
+  (official docs). Revisit only when switching models (see above).
 - Multi-line thinking in the log file: the file handler writes newlines as a literal
   `\n`, so one record is one line (greppable); the console keeps real newlines.
 - Run against the real SDK: loop, tool calls, approval, rejection (`n`) and thinking all

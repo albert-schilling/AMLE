@@ -34,6 +34,11 @@ def classify(
 
     logger.info("Classifying ticket %s", ticket.id)
 
+    # Manual extended thinking (budget_tokens) is a legacy mode: it works on Haiku 4.5
+    # but models from Claude 4.7 on reject it with a 400 and need adaptive thinking
+    # ({"type": "adaptive"} plus an effort level) instead. Haiku 4.5 does not think
+    # between tool calls (no interleaved thinking), so thinking appears at step 1 only.
+    # temperature/top_p/top_k cannot be set: API version 2026-10-21 rejects them.
     thinking: dict = (
         {"thinking": {"type": "enabled", "budget_tokens": settings.thinking_budget}}
         if settings.thinking_budget
