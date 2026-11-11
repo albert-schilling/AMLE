@@ -11,9 +11,14 @@ it gives a final answer. Tools: `lookup_customer` (read-only) and `escalate_to_h
 
 - Every Thought, Action and Observation is logged (logger `ticket_classifier.trace`,
   plain format on the console), followed by the final answer. Set `LOG_FILE` to also
-  write it, with timestamps, to a file.
+  write it, with timestamps, to a file (one record per line, newlines written as `\n`).
+- The model may make only one tool call per turn, so an escalation can use the customer
+  lookup result.
 - `escalate_to_human` only counts after a human types `y` at the console prompt. A
   rejection goes back to the model as a normal observation and the loop continues.
+- Extended thinking is on by default (`THINKING_BUDGET=2000`, must be >= 1024 and below
+  `MAX_TOKENS`, default 4000); the model's thinking is logged as `Thinking:` lines. It
+  costs extra tokens; set `THINKING_BUDGET=0` to turn it off.
 - The loop is capped at `MAX_ITERATIONS` (default 6). Hitting the cap escalates the
   ticket automatically (`escalated: true`, no category/priority).
 
@@ -52,7 +57,7 @@ Customers are read from `CUSTOMERS_PATH` (JSON object keyed by customer id).
 ## Configuration
 
 Environment variables or `.env`, see [.env.example](.env.example):
-`ANTHROPIC_API_KEY` (required), `MODEL`, `MAX_TOKENS`, `MAX_ITERATIONS`, `LOG_LEVEL`,
+`ANTHROPIC_API_KEY` (required), `MODEL`, `MAX_TOKENS`, `MAX_ITERATIONS`, `THINKING_BUDGET`, `LOG_LEVEL`,
 `LOG_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`.
 
 ## Layout

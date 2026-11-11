@@ -9,6 +9,13 @@ QUIET_LOGGERS = ("anthropic", "httpx", "httpcore", "httpx2", "httpcore2")
 FULL_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 
+class SingleLineFormatter(logging.Formatter):
+    """One record per line: newlines become a literal backslash-n (for log files)."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return super().format(record).replace("\r", "").replace("\n", "\\n")
+
+
 def configure_logging(settings: Settings) -> None:
     """Console: diagnostics with full format, trace in plain format.
 
@@ -44,7 +51,7 @@ def configure_logging(settings: Settings) -> None:
 def add_file_handler(path: Path, *loggers: logging.Logger) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     handler = logging.FileHandler(path, encoding="utf-8")
-    handler.setFormatter(logging.Formatter(FULL_FORMAT))
+    handler.setFormatter(SingleLineFormatter(FULL_FORMAT))
     handler.set_name(HANDLER_NAME)
     for log in loggers:
         log.addHandler(handler)

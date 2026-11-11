@@ -34,6 +34,12 @@ def classify(
 
     logger.info("Classifying ticket %s", ticket.id)
 
+    thinking: dict = (
+        {"thinking": {"type": "enabled", "budget_tokens": settings.thinking_budget}}
+        if settings.thinking_budget
+        else {}
+    )
+
     runner = client.beta.messages.tool_runner(
         model=settings.model,
         max_iterations=settings.max_iterations,
@@ -41,7 +47,10 @@ def classify(
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": create_prompt(ticket)}],
         tools=[lookup_customer, make_escalation_tool(escalation)],
+        # one tool call per turn: an escalation must see the lookup result first
+        tool_choice={"type": "auto", "disable_parallel_tool_use": True},
         output_format=TicketClassification,
+        **thinking,
     )
 
     for step, message in enumerate(runner, start=1):

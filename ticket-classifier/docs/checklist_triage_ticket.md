@@ -4,7 +4,8 @@
 - feature missing: team assignment
 - examples for JSON output in prompt
 - validate the result with LLM or other
-- user can do prompt injection
+- user can do prompt injection (partly mitigated: ticket text in `<ticket>` tags, system
+  prompt marks it untrusted; no hard guard or test against real injection attempts)
 - user could submit very long text, set maximum length
 - monitor token usage/limits
 - use a generic library to make it easy to switch to a different LLM (e.g. [OpenAI Docs](https://developers.openai.com/api/docs/libraries))
@@ -31,3 +32,4 @@
 - uses haiku by default (cheap, good) ✅
 - make options (model + max tokens) configurable (pydantic, configparser) ✅
 - no error handling (try.. except) ✅
+- agent loop with tools (customer lookup, `escalate_to_human`), human approval gate, iteration cap, trace logging, optional extended thinking ✅ (see PR #2; verified with real API runs)

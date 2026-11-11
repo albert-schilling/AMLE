@@ -1,7 +1,8 @@
 import pytest
-from conftest import message, observation, text, tool_use
+from conftest import message, observation, text, thinking, tool_use
 
 from ticket_classifier import ClassificationError, TicketClassification, classify
+from ticket_classifier.config import get_settings
 from ticket_classifier.tools import lookup_customer
 
 OK = TicketClassification(category="billing", priority="high")
@@ -40,6 +41,10 @@ def test_classify_configures_tool_runner(
     assert kwargs["tools"][1].name == "escalate_to_human"
     assert kwargs["output_format"] is TicketClassification
     assert kwargs["max_iterations"] == 3
+    assert kwargs["tool_choice"] == {
+        "type": "auto",
+        "disable_parallel_tool_use": True,
+    }
     assert "Test ticket" in kwargs["messages"][0]["content"]
     assert "1001" in kwargs["messages"][0]["content"]
 
@@ -138,3 +143,42 @@ def test_classify_logs_action_before_running_tools(
 
     assert "Action: escalate_to_human" in seen_when_tools_ran[0]
     assert "Observation" not in seen_when_tools_ran[0]
+
+
+def test_classify_sends_thinking_only_when_budget_set(
+    mock_client, runner_returns, make_ticket, monkeypatch
+):
+    monkeypatch.setenv("THINKING_BUDGET", "0")
+    runner_returns([message(parsed_output=OK)])
+    classify(make_ticket(), mock_client, never)
+    kwargs = mock_client.beta.messages.tool_runner.call_args.kwargs
+    assert "thinking" not in kwargs
+
+    monkeypatch.setenv("THINKING_BUDGET", "2000")
+    monkeypatch.setenv("MAX_TOKENS", "4000")
+    get_settings.cache_clear()
+    runner_returns([message(parsed_output=OK)])
+    classify(make_ticket(), mock_client, never)
+    kwargs = mock_client.beta.messages.tool_runner.call_args.kwargs
+    assert kwargs["thinking"] == {"type": "enabled", "budget_tokens": 2000}
+
+
+def test_classify_logs_thinking_blocks(
+    mock_client, runner_returns, make_ticket, caplog
+):
+    runner_returns(
+        [
+            message(
+                thinking("Customer is angry, check history."),
+                tool_use("lookup_customer", customer_id="1001"),
+                stop_reason="tool_use",
+            ),
+            message(parsed_output=OK),
+        ],
+        [observation("Alice"), None],
+    )
+    caplog.set_level("INFO", logger="ticket_classifier.trace")
+
+    classify(make_ticket(), mock_client, never)
+
+    assert "step 1 Thinking: Customer is angry, check history." in caplog.text

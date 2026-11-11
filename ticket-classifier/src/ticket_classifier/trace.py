@@ -1,4 +1,4 @@
-"""The agent loop's reasoning trace (Thought / Action / Observation), as log records.
+"""The agent loop's trace (Thinking / Thought / Action / Observation) as log records.
 
 Uses its own logger so the console can show it in a plain format while a log file
 (``LOG_FILE``) gets timestamps. See ``logging_config.py``.
@@ -14,6 +14,7 @@ trace_logger = logging.getLogger(TRACE_LOGGER_NAME)
 def log_actions(ticket_id: str, step: int, message: Any) -> None:
     """Log what the model said and wants to do. Call this *before* running the tools.
 
+    Thinking blocks (extended thinking, ``THINKING_BUDGET``) are logged as Thinking.
     Text next to tool calls is a Thought; text in a message without tool calls is
     the final Answer.
     """
@@ -21,7 +22,9 @@ def log_actions(ticket_id: str, step: int, message: Any) -> None:
     has_tool_calls = any(block.type == "tool_use" for block in message.content)
     label = "Thought" if has_tool_calls else "Answer"
     for block in message.content:
-        if block.type == "text" and block.text.strip():
+        if block.type == "thinking" and block.thinking.strip():
+            trace_logger.info("%s Thinking: %s", prefix, block.thinking.strip())
+        elif block.type == "text" and block.text.strip():
             trace_logger.info("%s %s: %s", prefix, label, block.text.strip())
         elif block.type == "tool_use":
             trace_logger.info("%s Action: %s(%s)", prefix, block.name, block.input)

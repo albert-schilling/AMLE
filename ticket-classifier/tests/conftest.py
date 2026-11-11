@@ -58,6 +58,10 @@ class FakeRunner:
         return self.messages[-1]
 
 
+def thinking(content):
+    return SimpleNamespace(type="thinking", thinking=content)
+
+
 def text(content):
     return SimpleNamespace(type="text", text=content)
 

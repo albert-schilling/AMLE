@@ -42,13 +42,13 @@ Working in pairs, on a new branch, starting from `scoutbot-baseline/`:
 
 ## Expected outcome (minimum requirements)
 
-- [ ] The loop reasons, acts, observes, and repeats — not a single call
-- [ ] A hard iteration cap is in place (the loop cannot run forever)
-- [ ] At least 2 new tools exist beyond yesterday's `triage_ticket`
-- [ ] `escalate_to_human` requires a human approval step before it "counts" as executed
-- [ ] Running your code on all 3 sample tickets prints the full trace for each
-- [ ] At least one test (mocking the model, same pattern as yesterday)
-- [ ] Work is on a branch with an open pull request
+- [x] The loop reasons, acts, observes, and repeats — not a single call
+- [x] A hard iteration cap is in place (the loop cannot run forever)
+- [x] At least 2 new tools exist beyond yesterday's `triage_ticket`
+- [x] `escalate_to_human` requires a human approval step before it "counts" as executed
+- [x] Running your code on all 3 sample tickets prints the full trace for each
+- [x] At least one test (mocking the model, same pattern as yesterday)
+- [x] Work is on a branch with an open pull request
 
 ## If you finish early
 
