@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 # .PHONY tells Make that these targets are commands, not actual files on disk
-.PHONY: format lint setup test run help
+.PHONY: format lint setup test run eval help
 
 # The default target that runs if you just type 'make'
 help:
@@ -12,6 +12,7 @@ help:
 	@echo "  make format  - Format the code using ruff"
 	@echo "  make lint    - Lint the code using ruff"
 	@echo "  make run     - Run the classifier script"
+	@echo "  make eval    - Run behavior evals against the real API (costs money)"
 
 setup:
 	uv sync
@@ -30,3 +31,7 @@ run:
 	@echo "WARNING: Executing this script will make calls to the Anthropic API causing potential charges."
 	@echo "Running classifier script..."
 	uv run ticket-classifier
+
+eval:
+	@echo "WARNING: Runs real tickets against the Anthropic API causing charges."
+	uv run python -m ticket_classifier.evals --runs 5
