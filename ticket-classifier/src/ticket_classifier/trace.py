@@ -32,6 +32,25 @@ def log_actions(ticket_id: str, step: int, message: Any) -> None:
             trace_logger.info("%s Action: %s(%s)", prefix, block.name, block.input)
         elif block.type == "web_fetch_tool_result":
             trace_logger.info("%s Observation: %s", prefix, describe_fetch(block))
+        elif block.type in CODE_RESULT_TYPES:
+            trace_logger.info("%s Observation: %s", prefix, describe_code(block))
+
+
+CODE_RESULT_TYPES = (
+    "bash_code_execution_tool_result",
+    "text_editor_code_execution_tool_result",
+)
+
+
+def describe_code(block: Any) -> str:
+    """Summary of a code execution result: stdout/stderr, or the error code."""
+    result = block.content
+    if result.type.endswith("_error"):
+        return f"code execution failed: {result.error_code}"
+    if result.type == "bash_code_execution_result":
+        output = (result.stdout or result.stderr).strip()
+        return f"code execution exit {result.return_code}: {output}"
+    return f"code execution ok: {result.type}"
 
 
 def describe_fetch(block: Any) -> str:

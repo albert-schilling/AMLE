@@ -84,6 +84,21 @@ def web_fetch_result(url=None, error_code=None):
     return SimpleNamespace(type="web_fetch_tool_result", content=content)
 
 
+def code_result(stdout="", return_code=0, error_code=None):
+    if error_code:
+        content = SimpleNamespace(
+            type="bash_code_execution_tool_result_error", error_code=error_code
+        )
+    else:
+        content = SimpleNamespace(
+            type="bash_code_execution_result",
+            stdout=stdout,
+            stderr="",
+            return_code=return_code,
+        )
+    return SimpleNamespace(type="bash_code_execution_tool_result", content=content)
+
+
 def message(*blocks, stop_reason="end_turn", parsed_output=None):
     return SimpleNamespace(
         content=list(blocks), stop_reason=stop_reason, parsed_output=parsed_output

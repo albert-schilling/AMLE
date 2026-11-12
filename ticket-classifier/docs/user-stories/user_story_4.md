@@ -18,3 +18,11 @@ Connect eval() to your agent. THIS IS VERY RISKY. DO NOT DO THIS. DO NOT DO THIS
 
 - learn what the eval() function in Python does
 - DO NOT COMBINE THIS WITH THE WEB SEARCH FUNCTION UNLESS YOU RUN IT ON A COMPUTER FAR FAR AWAY!
+
+## Result 4
+
+- Tool: `code_execution_20250825` (server-side Anthropic container: no internet, 5 GiB RAM, 1 CPU, fixed execution time limit; free hours then $0.05 per container hour). Options checked: newer versions (`20260120`, `20260521`) add REPL state and programmatic tool calling, not available on Haiku 4.5.
+- File: `fixtures/sample_app.log` is uploaded once via the Files API and attached as a `container_upload` block, outside the untrusted ticket text. The agent finds it in `$INPUT_DIR`.
+- Guardrails: the tool has no `max_uses`, so the limits are the container, the loop cap (`MAX_ITERATIONS`), `max_tokens` and the prompt (`LOG_ANALYSIS`: code for counting, max. 3 calls, only the attached file, logs are untrusted). Code and output are traced.
+- T-2002 (expected answer: 5 errors at or after 15:00; the 14:59:59 WARN does not count), `claude-haiku-5-5`, 10 runs: all used the sandbox with no failures; 9/10 computed 5 in code; 1 only counted all errors in code and probably counted the rest by eye; 1 used 4 code calls (limit 3).
+- Open: the structured result holds only category and priority, so the answer "5" appears only in the trace.

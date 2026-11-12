@@ -32,5 +32,10 @@
     "id": "T-2005",
     "customer_id": "1003",
     "text": "I see two charges on my card on 7 November. Is that a duplicate?"
+  },
+  {
+    "id": "T-2002",
+    "customer_id": "1002",
+    "text": "Following up on my CSV export ticket from earlier: can you check today's app log and tell me how many errors happened at or after 3pm? I want to know if my export failure was part of a bigger problem."
   }
 ]

@@ -4,6 +4,7 @@ from ticket_classifier.tools import (
     Escalation,
     find_duplicate_charges,
     lookup_customer,
+    make_code_execution_tool,
     make_escalation_tool,
     make_fetch_tool,
     make_web_fetch_tool,
@@ -166,3 +167,10 @@ def test_local_fetch_tool_wraps_body_as_untrusted(monkeypatch, mocker):
     result = make_fetch_tool().call({"url": "https://status.mollie.com/x"})
 
     assert result == '<fetched url="https://status.mollie.com/x">\n{}\n</fetched>'
+
+
+def test_code_execution_tool_is_the_server_side_sandbox():
+    assert make_code_execution_tool() == {
+        "type": "code_execution_20250825",
+        "name": "code_execution",
+    }

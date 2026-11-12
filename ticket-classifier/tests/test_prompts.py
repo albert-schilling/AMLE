@@ -54,6 +54,7 @@ def test_system_prompt_is_the_joined_blocks_in_order():
         prompts.ESCALATION,
         prompts.STATUS_CHECK,
         prompts.DUPLICATE_CHECK,
+        prompts.LOG_ANALYSIS,
         prompts.UNTRUSTED_PAGES,
         prompts.TRACE_STYLE,
         prompts.UNTRUSTED_TICKET,
@@ -70,3 +71,9 @@ def test_status_check_block_names_the_relevant_components():
         "Settlements (Payouts)",
     ):
         assert name in prompts.STATUS_CHECK
+
+
+def test_log_analysis_block_limits_and_delegates_counting_to_code():
+    assert "code_execution" in prompts.LOG_ANALYSIS
+    assert "never count by hand" in prompts.LOG_ANALYSIS
+    assert "at most 3 code calls" in prompts.LOG_ANALYSIS

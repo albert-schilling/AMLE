@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     web_fetch_max_content_tokens: int = 8_000  # cap on the fetched page size
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_file: Path | None = None  # also write logs and trace here, if set
+    log_path: Path = Path(
+        "fixtures/sample_app.log"
+    )  # uploaded to the sandbox if it exists
     tickets_path: Path = Path("fixtures/tickets.json")
     customers_path: Path = Path("fixtures/customers.json")
     results_path: Path = Path("output/results.json")

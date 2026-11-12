@@ -44,13 +44,16 @@ def to_classified_ticket(ticket: Ticket, triage: TriageResult) -> ClassifiedTick
 
 
 def classify_all(
-    tickets: list[Ticket], client: Anthropic, approve: Callable[[str], bool]
+    tickets: list[Ticket],
+    client: Anthropic,
+    approve: Callable[[str], bool],
+    log_file_id: str | None = None,
 ) -> BatchResult:
     """Classify every ticket; a failing ticket is recorded and skipped."""
     batch = BatchResult()
     for ticket in tickets:
         try:
-            triage = classify(ticket, client, approve)
+            triage = classify(ticket, client, approve, log_file_id)
         except (ClassificationError, APIError) as error:
             batch.failed.append(ticket.id)
             logger.error("Ticket %s failed: %s", ticket.id, error)

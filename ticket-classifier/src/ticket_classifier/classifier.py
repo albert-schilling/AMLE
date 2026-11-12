@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable
+from pathlib import Path
 
 from anthropic import Anthropic
 
@@ -10,6 +11,7 @@ from .tools import (
     Escalation,
     find_duplicate_charges,
     lookup_customer,
+    make_code_execution_tool,
     make_escalation_tool,
     make_fetch_tool,
 )
@@ -22,18 +24,42 @@ class ClassificationError(RuntimeError):
     """The model did not return a usable classification."""
 
 
+def upload_log(client: Anthropic, path: Path) -> str:
+    """Upload the log file once; the sandbox can only read files given this way."""
+    uploaded = client.beta.files.upload(
+        file=(path.name, path.read_bytes(), "text/plain")
+    )
+    logger.info("Uploaded %s as %s", path, uploaded.id)
+    return uploaded.id
+
+
 def create_client() -> Anthropic:
     return Anthropic(api_key=get_settings().anthropic_api_key.get_secret_value())
 
 
+def user_content(ticket: Ticket, log_file_id: str | None) -> str | list[dict]:
+    """The user message: plain text, or text plus a file for the code sandbox."""
+    prompt = create_prompt(ticket)
+    if log_file_id is None:
+        return prompt
+    return [
+        {"type": "text", "text": f"{prompt}\nAttached log file: {log_file_id}"},
+        {"type": "container_upload", "file_id": log_file_id},
+    ]
+
+
 def classify(
-    ticket: Ticket, client: Anthropic, approve: Callable[[str], bool]
+    ticket: Ticket,
+    client: Anthropic,
+    approve: Callable[[str], bool],
+    log_file_id: str | None = None,
 ) -> Resolved | Escalated:
     """Run the agent loop for one ticket and log its reasoning trace.
 
     The loop (reason, call a tool, observe, repeat) is capped at ``max_iterations``;
     hitting the cap counts as an automatic escalation. ``approve`` is the human
-    gate for ``escalate_to_human``.
+    gate for ``escalate_to_human``. ``log_file_id`` (an uploaded file) is attached to
+    the prompt so the code execution sandbox can read it.
     """
     settings = get_settings()
     escalation = Escalation(approve)
@@ -56,12 +82,13 @@ def classify(
         max_iterations=settings.max_iterations,
         max_tokens=settings.max_tokens,
         system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": create_prompt(ticket)}],
+        messages=[{"role": "user", "content": user_content(ticket, log_file_id)}],
         tools=[
             lookup_customer,
             make_escalation_tool(escalation),
             make_fetch_tool(),
             find_duplicate_charges,
+            make_code_execution_tool(),
         ],
         # one tool call per turn: an escalation must see the lookup result first
         tool_choice={"type": "auto", "disable_parallel_tool_use": True},

@@ -2,11 +2,12 @@ import argparse
 import logging
 from pathlib import Path
 
+from anthropic import APIError
 from pydantic import ValidationError
 
 from .approval import console_approval
 from .batch import classify_all
-from .classifier import create_client
+from .classifier import create_client, upload_log
 from .config import get_settings
 from .logging_config import configure_logging
 from .storage import load_tickets, save_results
@@ -42,7 +43,17 @@ def main(argv: list[str] | None = None) -> int:
 
     logger.info("Loaded %d tickets from %s", len(tickets), tickets_path)
 
-    batch = classify_all(tickets, create_client(), console_approval)
+    client = create_client()
+    log_file_id = None
+    if settings.log_path.exists():
+        try:
+            log_file_id = upload_log(client, settings.log_path)
+        except APIError as error:
+            logger.error(
+                "Cannot upload %s, continuing without it: %s", settings.log_path, error
+            )
+
+    batch = classify_all(tickets, client, console_approval, log_file_id)
     save_results(batch.classified, settings.results_path)
     logger.info(
         "Classified %d/%d tickets, results in %s",

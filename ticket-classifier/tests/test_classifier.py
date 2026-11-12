@@ -1,5 +1,6 @@
 import pytest
 from conftest import (
+    code_result,
     message,
     observation,
     server_tool_use,
@@ -10,6 +11,7 @@ from conftest import (
 )
 
 from ticket_classifier import ClassificationError, TicketClassification, classify
+from ticket_classifier.classifier import upload_log
 from ticket_classifier.config import get_settings
 from ticket_classifier.tools import find_duplicate_charges, lookup_customer
 
@@ -49,6 +51,7 @@ def test_classify_configures_tool_runner(
     assert kwargs["tools"][1].name == "escalate_to_human"
     assert kwargs["tools"][2]["name"] == "web_fetch"
     assert kwargs["tools"][3] is find_duplicate_charges
+    assert kwargs["tools"][4]["type"] == "code_execution_20250825"
     assert kwargs["output_format"] is TicketClassification
     assert kwargs["max_iterations"] == 3
     assert kwargs["tool_choice"] == {
@@ -218,4 +221,68 @@ def test_classify_logs_server_side_web_fetch(
     classify(make_ticket(), mock_client, never)
 
     assert "Action: web_fetch" in caplog.text
+    assert expected in caplog.text
+
+
+def test_classify_without_log_sends_plain_text(
+    mock_client, runner_returns, make_ticket
+):
+    runner_returns([message(parsed_output=OK)])
+
+    classify(make_ticket(), mock_client, never)
+
+    content = mock_client.beta.messages.tool_runner.call_args.kwargs["messages"][0][
+        "content"
+    ]
+    assert isinstance(content, str)
+
+
+def test_classify_attaches_log_file_for_the_sandbox(
+    mock_client, runner_returns, make_ticket
+):
+    runner_returns([message(parsed_output=OK)])
+
+    classify(make_ticket(), mock_client, never, log_file_id="file_123")
+
+    content = mock_client.beta.messages.tool_runner.call_args.kwargs["messages"][0][
+        "content"
+    ]
+    assert {"type": "container_upload", "file_id": "file_123"} in content
+    assert "Test ticket" in content[0]["text"]
+
+
+def test_upload_log_returns_the_file_id(mock_client, tmp_path):
+    log = tmp_path / "app.log"
+    log.write_text("x")
+    mock_client.beta.files.upload.return_value.id = "file_9"
+
+    assert upload_log(mock_client, log) == "file_9"
+    name, data, _ = mock_client.beta.files.upload.call_args.kwargs["file"]
+    assert (name, data) == ("app.log", b"x")
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [
+        (code_result(stdout="5\n"), "exit 0: 5"),
+        (code_result(error_code="execution_time_exceeded"), "execution_time_exceeded"),
+    ],
+)
+def test_classify_logs_code_execution(
+    mock_client, runner_returns, make_ticket, caplog, result, expected
+):
+    runner_returns(
+        [
+            message(
+                server_tool_use("bash_code_execution", command="grep -c ERROR x"),
+                result,
+                parsed_output=OK,
+            )
+        ]
+    )
+    caplog.set_level("INFO", logger="ticket_classifier.trace")
+
+    classify(make_ticket(), mock_client, never)
+
+    assert "Action: bash_code_execution" in caplog.text
     assert expected in caplog.text

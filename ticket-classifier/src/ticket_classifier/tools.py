@@ -125,6 +125,16 @@ def make_local_fetch_tool() -> BetaFunctionTool[Any]:
     return web_fetch
 
 
+def make_code_execution_tool() -> dict[str, Any]:
+    """Anthropic's server-side code execution tool (a sandboxed Linux container).
+
+    The container has no internet, 5 GiB RAM, 1 CPU and an execution time limit that
+    we cannot change. The tool has no ``max_uses``; the loop cap and the prompt limit
+    how often it runs.
+    """
+    return {"type": "code_execution_20250825", "name": "code_execution"}
+
+
 def make_fetch_tool() -> dict[str, Any] | BetaFunctionTool[Any]:
     """The fetch tool for ``FETCH_BACKEND``: Anthropic's server tool or our own."""
     if get_settings().fetch_backend == "local":
