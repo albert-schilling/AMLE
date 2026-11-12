@@ -43,3 +43,11 @@ As the billing team, we want to have Scoutbot make sure that the payment provide
 - implement a tool that does the web search yourself.
 - use httpx.get()
 - TAKE SAFETY PRECAUTIONS: RESTRICT THE WEB ACCESS TO A URL YOU KNOW
+
+### Result 3.3
+
+- Local tool `web_fetch` (`FETCH_BACKEND=local`, default `server`) using `httpx2`. Checks in [safe_fetch.py](../../src/ticket_classifier/safe_fetch.py): https only, exact host allowlist, no credentials or odd ports, no private IPs, no redirects, 5 s timeout, 100 KB cap, JSON/text only, max. 3 calls per ticket. Known gap: DNS rebinding between check and request.
+- Real runs on `claude-haiku-5-5`, 10 per ticket (T-2001, T-2004, T-2005):
+  - Payments fetch and `find_duplicate_charges`: 30/30, all correct (no skipped tools).
+  - Mollie status fetch: 26/30; 4 got `HTTP 403` and later 5/5 sequential tries too, while `curl` gets 200. Probably bot protection on the Vercel-hosted status page. The server-side `web_fetch` is not blocked. The agent reports such a status as unverified.
+- Takeaway: a local fetch is more reliable for our own data, but the safety work is ours and some sites block python clients. Keep `server` as default.

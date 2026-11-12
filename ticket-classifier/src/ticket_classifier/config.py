@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     max_tokens: int = 4_000
     max_iterations: int = 6  # hard cap of the agent loop; hitting it escalates
     thinking_budget: int = 2_000  # extended thinking tokens per reply; 0 = off
+    # "server": Anthropic's sandboxed web_fetch; "local": our own httpx tool
+    fetch_backend: Literal["server", "local"] = "server"
     status_domain: str = "status.mollie.com"  # a domain web_fetch may reach
     status_url: str = "https://status.mollie.com/api/v2/components.json"
     # fake payments file on GitHub Pages (docs/payments.json); bare domain only,

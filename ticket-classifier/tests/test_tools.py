@@ -5,6 +5,7 @@ from ticket_classifier.tools import (
     find_duplicate_charges,
     lookup_customer,
     make_escalation_tool,
+    make_fetch_tool,
     make_web_fetch_tool,
 )
 
@@ -130,3 +131,38 @@ def test_find_duplicate_charges_rejects_malformed_rows():
     )
 
     assert result.startswith("Invalid payment rows")
+
+
+def test_fetch_backend_server_is_default():
+    assert make_fetch_tool()["type"] == "web_fetch_20250910"
+
+
+def test_fetch_backend_local_builds_our_own_tool(monkeypatch):
+    monkeypatch.setenv("FETCH_BACKEND", "local")
+
+    tool = make_fetch_tool()
+
+    assert tool.name == "web_fetch"
+
+
+def test_local_fetch_tool_limits_calls_and_refuses_hosts(monkeypatch):
+    monkeypatch.setenv("FETCH_BACKEND", "local")
+    monkeypatch.setenv("WEB_FETCH_MAX_USES", "2")
+    tool = make_fetch_tool()
+
+    first = tool.call({"url": "https://evil.example.com/x"})
+    second = tool.call({"url": "https://evil.example.com/x"})
+    third = tool.call({"url": "https://evil.example.com/x"})
+
+    assert first.startswith("Fetch refused")
+    assert second.startswith("Fetch refused")
+    assert third == "Fetch limit reached for this ticket"
+
+
+def test_local_fetch_tool_wraps_body_as_untrusted(monkeypatch, mocker):
+    monkeypatch.setenv("FETCH_BACKEND", "local")
+    mocker.patch("ticket_classifier.tools.fetch_text", return_value="{}")
+
+    result = make_fetch_tool().call({"url": "https://status.mollie.com/x"})
+
+    assert result == '<fetched url="https://status.mollie.com/x">\n{}\n</fetched>'

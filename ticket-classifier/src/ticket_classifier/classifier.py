@@ -11,7 +11,7 @@ from .tools import (
     find_duplicate_charges,
     lookup_customer,
     make_escalation_tool,
-    make_web_fetch_tool,
+    make_fetch_tool,
 )
 from .trace import log_actions, log_final, log_observations
 
@@ -60,7 +60,7 @@ def classify(
         tools=[
             lookup_customer,
             make_escalation_tool(escalation),
-            make_web_fetch_tool(),
+            make_fetch_tool(),
             find_duplicate_charges,
         ],
         # one tool call per turn: an escalation must see the lookup result first

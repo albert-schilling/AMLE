@@ -12,6 +12,7 @@ from .config import get_settings
 from .customers import get_customer
 from .models import Payment
 from .payments import find_duplicates
+from .safe_fetch import FetchRefused, fetch_text
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,40 @@ def make_escalation_tool(escalation: Escalation) -> BetaFunctionTool[Any]:
         return "Escalation approved. A human will take over this ticket."
 
     return escalate_to_human
+
+
+def make_local_fetch_tool() -> BetaFunctionTool[Any]:
+    """Our own ``web_fetch``: runs here via httpx, so ``safe_fetch`` is the sandbox.
+
+    One tool per ticket: it counts its calls and stops at ``WEB_FETCH_MAX_USES``.
+    """
+    settings = get_settings()
+    allowed_hosts = {settings.status_domain.lower(), settings.payments_domain.lower()}
+    calls = 0
+
+    @beta_tool(name="web_fetch")
+    def web_fetch(url: str) -> str:
+        """Fetch one page from an allowed host and return its text."""
+        nonlocal calls
+        calls += 1
+        logger.info("Local fetch %d: %s", calls, url)
+        if calls > settings.web_fetch_max_uses:
+            return "Fetch limit reached for this ticket"
+        try:
+            body = fetch_text(url, allowed_hosts)
+        except FetchRefused as error:
+            logger.warning("Fetch refused: %s", error)
+            return f"Fetch refused: {error}"
+        return f'<fetched url="{url}">\n{body}\n</fetched>'
+
+    return web_fetch
+
+
+def make_fetch_tool() -> dict[str, Any] | BetaFunctionTool[Any]:
+    """The fetch tool for ``FETCH_BACKEND``: Anthropic's server tool or our own."""
+    if get_settings().fetch_backend == "local":
+        return make_local_fetch_tool()
+    return make_web_fetch_tool()
 
 
 def make_web_fetch_tool() -> dict[str, Any]:
