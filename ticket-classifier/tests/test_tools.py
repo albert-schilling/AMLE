@@ -2,6 +2,7 @@ import json
 
 from ticket_classifier.tools import (
     Escalation,
+    find_duplicate_charges,
     lookup_customer,
     make_escalation_tool,
     make_web_fetch_tool,
@@ -71,7 +72,10 @@ def test_web_fetch_tool_has_guardrails():
 
     assert tool["type"] == "web_fetch_20250910"
     assert tool["max_uses"] == 3
-    assert tool["allowed_domains"] == ["status.mollie.com"]
+    assert tool["allowed_domains"] == [
+        "status.mollie.com",
+        "albert-schilling.github.io",
+    ]
     assert tool["max_content_tokens"] > 0
 
 
@@ -81,5 +85,48 @@ def test_web_fetch_guardrails_follow_settings(monkeypatch):
 
     tool = make_web_fetch_tool()
 
-    assert tool["allowed_domains"] == ["status.example.com"]
+    assert tool["allowed_domains"][0] == "status.example.com"
     assert tool["max_uses"] == 1
+
+
+def row(client_id, invoice, amount, timestamp):
+    return {
+        "client_id": client_id,
+        "invoice_number": invoice,
+        "amount": amount,
+        "timestamp": timestamp,
+    }
+
+
+def test_find_duplicate_charges_reports_pair():
+    rows = [
+        row("1001", "A", 29.0, "2026-11-03T08:15:00Z"),
+        row("1001", "B", 29.0, "2026-11-03T08:15:41Z"),
+    ]
+
+    result = json.loads(
+        find_duplicate_charges.call({"client_id": "1001", "payments": rows})
+    )
+
+    assert result == [{"invoices": ["A", "B"], "amount": "29.0", "seconds_apart": 41}]
+
+
+def test_find_duplicate_charges_ignores_other_clients_and_amounts():
+    rows = [
+        row("1001", "A", 29.0, "2026-11-03T08:15:00Z"),
+        row("1002", "B", 29.0, "2026-11-03T08:15:41Z"),  # other client
+        row("1001", "C", 14.5, "2026-11-03T08:16:00Z"),  # other amount
+        row("1001", "D", 29.0, "2026-12-03T08:15:00Z"),  # a month later
+    ]
+
+    result = find_duplicate_charges.call({"client_id": "1001", "payments": rows})
+
+    assert result == "No duplicate charges found for client 1001"
+
+
+def test_find_duplicate_charges_rejects_malformed_rows():
+    result = find_duplicate_charges.call(
+        {"client_id": "1001", "payments": [{"client_id": "1001"}]}
+    )
+
+    assert result.startswith("Invalid payment rows")

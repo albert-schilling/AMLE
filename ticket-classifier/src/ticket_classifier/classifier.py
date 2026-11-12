@@ -8,6 +8,7 @@ from .models import Escalated, Resolved, Ticket, TicketClassification
 from .prompts import SYSTEM_PROMPT, create_prompt
 from .tools import (
     Escalation,
+    find_duplicate_charges,
     lookup_customer,
     make_escalation_tool,
     make_web_fetch_tool,
@@ -60,6 +61,7 @@ def classify(
             lookup_customer,
             make_escalation_tool(escalation),
             make_web_fetch_tool(),
+            find_duplicate_charges,
         ],
         # one tool call per turn: an escalation must see the lookup result first
         tool_choice={"type": "auto", "disable_parallel_tool_use": True},

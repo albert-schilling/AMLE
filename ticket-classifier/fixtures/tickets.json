@@ -21,6 +21,16 @@
   {
     "id": "T-2001",
     "customer_id": "1001",
-    "text": "I got charged twice again this month, same as before. Before you process a refund, can you check whether Mollie (our payment processor) is reporting any current outage that might explain a duplicate charge on their end? Their status is at https://status.mollie.com/api/v2/components.json"
+    "text": "I got charged twice again this month, same as before. Before you process a refund, can you check whether Mollie (our payment processor) is reporting any current outage that might explain a duplicate charge on their end?"
+  },
+  {
+    "id": "T-2004",
+    "customer_id": "1001",
+    "text": "I think I was charged twice on 3 November. Can you check my payments?"
+  },
+  {
+    "id": "T-2005",
+    "customer_id": "1003",
+    "text": "I see two charges on my card on 7 November. Is that a duplicate?"
   }
 ]

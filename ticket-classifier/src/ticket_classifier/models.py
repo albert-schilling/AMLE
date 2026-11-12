@@ -1,3 +1,5 @@
+from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -75,3 +77,12 @@ class Customer(BaseModel):
     past_refunds_90d: int
     plan: Literal["free", "pro"]
     products: list[Product]
+
+
+class Payment(BaseModel):
+    """One row of the (fake) payments file served on GitHub Pages."""
+
+    client_id: str
+    invoice_number: str
+    amount: Decimal
+    timestamp: datetime

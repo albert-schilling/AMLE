@@ -16,7 +16,12 @@ class Settings(BaseSettings):
     max_tokens: int = 4_000
     max_iterations: int = 6  # hard cap of the agent loop; hitting it escalates
     thinking_budget: int = 2_000  # extended thinking tokens per reply; 0 = off
-    status_domain: str = "status.mollie.com"  # only domain web_fetch may reach
+    status_domain: str = "status.mollie.com"  # a domain web_fetch may reach
+    status_url: str = "https://status.mollie.com/api/v2/components.json"
+    # fake payments file on GitHub Pages (docs/payments.json); bare domain only,
+    # the API refuses a path in allowed_domains
+    payments_domain: str = "albert-schilling.github.io"
+    payments_url: str = "https://albert-schilling.github.io/AMLE/payments.json"
     web_fetch_max_uses: int = 3  # web_fetch calls per ticket
     web_fetch_max_content_tokens: int = 8_000  # cap on the fetched page size
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"

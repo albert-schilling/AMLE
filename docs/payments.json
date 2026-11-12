@@ -1,0 +1,11 @@
+[
+  {"client_id": "1001", "invoice_number": "INV-2026-0901", "amount": 29.0, "timestamp": "2026-09-03T08:15:00Z"},
+  {"client_id": "1001", "invoice_number": "INV-2026-1001", "amount": 29.0, "timestamp": "2026-10-03T08:15:00Z"},
+  {"client_id": "1001", "invoice_number": "INV-2026-1101", "amount": 29.0, "timestamp": "2026-11-03T08:15:00Z"},
+  {"client_id": "1001", "invoice_number": "INV-2026-1102", "amount": 29.0, "timestamp": "2026-11-03T08:15:41Z"},
+  {"client_id": "1002", "invoice_number": "INV-2026-1103", "amount": 9.0, "timestamp": "2026-11-05T10:00:00Z"},
+  {"client_id": "1003", "invoice_number": "INV-2026-0902", "amount": 29.0, "timestamp": "2026-09-07T12:30:00Z"},
+  {"client_id": "1003", "invoice_number": "INV-2026-1002", "amount": 29.0, "timestamp": "2026-10-07T12:30:00Z"},
+  {"client_id": "1003", "invoice_number": "INV-2026-1104", "amount": 29.0, "timestamp": "2026-11-07T12:30:00Z"},
+  {"client_id": "1003", "invoice_number": "INV-2026-1105", "amount": 14.5, "timestamp": "2026-11-07T12:31:10Z"}
+]

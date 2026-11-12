@@ -8,14 +8,14 @@ As the billing team, we want to have Scoutbot make sure that the payment provide
 ## Steps
 
 - connect to "status.mollie.com" (`allowed_domains`)
-- the ticket contains the URL `https://status.mollie.com/api/v2/components.json`, because web fetch only follows URLs that appear in the conversation
+- the URL `https://status.mollie.com/api/v2/components.json` is given to the model as a trusted reference URL in the user message (outside the ticket text), because web fetch only follows URLs that appear in the conversation. The coach suggested putting it in the ticket; we keep it out of the untrusted ticket text.
 - use the web page max. 3 times per ticket
 - make sure there are no incidents reported on the status page. The four payment-relevant top-level components "Platform availability", "International payment methods", "Local payment methods" and "Settlements (Payouts)" need status `OPERATIONAL`, and so must their child components. The other components ("App & Customer Service", "Integrations") are ignored.
 - run the web fetch in a safe sandbox
 - integrate the web fetch into the agent for billing issues.
 - include the guardrails on slide 9
 - ignore privacy concerns for now
-- sample ticket T-2001 needs the status check (payment provider changed from Stripe to Mollie, status URL added to the ticket text)
+- sample ticket T-2001 needs the status check (payment provider changed from Stripe to Mollie, status URL passed as reference URL)
 - docs: https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool
 
 ## Optional Goal 3.1

@@ -1,3 +1,4 @@
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -5,10 +6,12 @@ from typing import Any
 
 from anthropic import beta_tool
 from anthropic.lib.tools import BetaFunctionTool
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from .config import get_settings
 from .customers import get_customer
+from .models import Payment
+from .payments import find_duplicates
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,40 @@ def lookup_customer(customer_id: str) -> str:
         return "Customer not found"
 
     return customer.model_dump_json()
+
+
+PAYMENTS_ADAPTER = TypeAdapter(list[Payment])
+
+
+@beta_tool
+def find_duplicate_charges(client_id: str, payments: list[dict[str, Any]]) -> str:
+    """Find duplicate charges of one client: same amount within 24 hours.
+
+    Pass the rows of the payments JSON you fetched with web_fetch. Never count
+    duplicates yourself: report only what this tool returns.
+    """
+    logger.info("Checking %d payment rows of client %s", len(payments), client_id)
+    try:
+        rows = PAYMENTS_ADAPTER.validate_python(payments)
+    except ValidationError:
+        logger.exception("Payment rows are malformed")
+        return "Invalid payment rows: need client_id, invoice_number, amount, timestamp"
+
+    pairs = find_duplicates(rows, client_id)
+    if not pairs:
+        return f"No duplicate charges found for client {client_id}"
+    return json.dumps(
+        [
+            {
+                "invoices": [first.invoice_number, second.invoice_number],
+                "amount": str(first.amount),
+                "seconds_apart": int(
+                    (second.timestamp - first.timestamp).total_seconds()
+                ),
+            }
+            for first, second in pairs
+        ]
+    )
 
 
 @dataclass
@@ -63,14 +100,15 @@ def make_escalation_tool(escalation: Escalation) -> BetaFunctionTool[Any]:
 def make_web_fetch_tool() -> dict[str, Any]:
     """Anthropic's server-side ``web_fetch`` tool, locked down by guardrails.
 
-    Anthropic runs the fetch (our sandbox); it can only reach ``STATUS_DOMAIN``, at
-    most ``WEB_FETCH_MAX_USES`` times per ticket, and the page size is capped.
+    Anthropic runs the fetch (our sandbox); it can only reach ``STATUS_DOMAIN`` and
+    ``PAYMENTS_DOMAIN``, at most ``WEB_FETCH_MAX_USES`` times per ticket, and the page
+    size is capped.
     """
     settings = get_settings()
     return {
         "type": "web_fetch_20250910",
         "name": "web_fetch",
         "max_uses": settings.web_fetch_max_uses,
-        "allowed_domains": [settings.status_domain],
+        "allowed_domains": [settings.status_domain, settings.payments_domain],
         "max_content_tokens": settings.web_fetch_max_content_tokens,
     }

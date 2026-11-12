@@ -11,7 +11,7 @@ from conftest import (
 
 from ticket_classifier import ClassificationError, TicketClassification, classify
 from ticket_classifier.config import get_settings
-from ticket_classifier.tools import lookup_customer
+from ticket_classifier.tools import find_duplicate_charges, lookup_customer
 
 OK = TicketClassification(category="billing", priority="high")
 
@@ -48,6 +48,7 @@ def test_classify_configures_tool_runner(
     assert kwargs["tools"][0] is lookup_customer
     assert kwargs["tools"][1].name == "escalate_to_human"
     assert kwargs["tools"][2]["name"] == "web_fetch"
+    assert kwargs["tools"][3] is find_duplicate_charges
     assert kwargs["output_format"] is TicketClassification
     assert kwargs["max_iterations"] == 3
     assert kwargs["tool_choice"] == {
