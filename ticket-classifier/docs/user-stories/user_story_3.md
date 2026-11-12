@@ -29,6 +29,15 @@ As the billing team, we want to have Scoutbot make sure that the payment provide
 - access the page using the web_fetch tool and have the agent match the billing with client data
 - should the matching of client data and billing info be done by an agent?
 
+### Result 3.2
+
+- Data: [docs/payments.json](../../../docs/payments.json) on GitHub Pages, fetched with `web_fetch`.
+- Matching is done in code, not by the agent: tool `find_duplicate_charges` (same client and amount within 24 h). The agent only passes the fetched rows.
+- Real runs on `claude-haiku-5-5`, 10 per ticket:
+  - T-2004 (duplicate): 10/10 found `INV-2026-1101` and `INV-2026-1102`, 41 s apart.
+  - T-2005 (no duplicate): 7/10 correctly "none found"; 3/10 skipped all tools (known flakiness, see [user_story_3_flaky_fetch.md](user_story_3_flaky_fetch.md)).
+- Gotchas: `allowed_domains` accepts a bare domain only (a path gives `url_not_allowed`), and web fetch caches failures, so a fetch made before Pages was live kept returning `url_not_accessible` (workaround: `?v=1` on the URL or `use_cache: false`).
+
 ## Optional Goal 3.3
 
 - implement a tool that does the web search yourself.
