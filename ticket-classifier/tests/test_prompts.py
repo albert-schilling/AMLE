@@ -1,3 +1,4 @@
+from ticket_classifier import prompts
 from ticket_classifier.prompts import SYSTEM_PROMPT, create_prompt
 
 
@@ -43,3 +44,29 @@ def test_prompt_has_trusted_reference_urls_outside_the_ticket(make_ticket):
     assert "https://status.mollie.com/api/v2/components.json" in reference
     assert "payments.json" in reference
     assert "http" not in ticket
+
+
+def test_system_prompt_is_the_joined_blocks_in_order():
+    blocks = [
+        prompts.ROLE,
+        prompts.PRIORITY,
+        prompts.CUSTOMER_LOOKUP,
+        prompts.ESCALATION,
+        prompts.STATUS_CHECK,
+        prompts.DUPLICATE_CHECK,
+        prompts.UNTRUSTED_PAGES,
+        prompts.TRACE_STYLE,
+        prompts.UNTRUSTED_TICKET,
+    ]
+
+    assert SYSTEM_PROMPT == " ".join(blocks)
+
+
+def test_status_check_block_names_the_relevant_components():
+    for name in (
+        "Platform availability",
+        "International payment methods",
+        "Local payment methods",
+        "Settlements (Payouts)",
+    ):
+        assert name in prompts.STATUS_CHECK

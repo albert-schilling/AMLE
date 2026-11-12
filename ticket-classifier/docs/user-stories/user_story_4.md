@@ -10,7 +10,7 @@ Ticket T-2002 needs information from a log file to be resolved. Use code executi
 - the code should run in a sandbox
 - ignore privacy concerns for now
 - run the ticket and make sure it gets processed correctly
-- docs: https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool
+- docs: <https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool>
 
 ## Optional Goal 4.X: DO NOT DO THIS
 
