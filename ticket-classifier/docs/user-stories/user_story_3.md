@@ -1,17 +1,21 @@
 # USER STORY 3: Web Fetch of a live status page
 
-As the billing team, we want to have Scoutbot make sure that the payment provider (Stripe) is running before assuming a duplicate charge is Anchorpoint's fault.
+As the billing team, we want to have Scoutbot make sure that the payment provider (Mollie) is running before assuming a duplicate charge is Anchorpoint's fault.
+
+> Changed after coach feedback: Stripe's status page is rendered by JavaScript, so web fetch
+> cannot read it (see [user_story_3_problem.md](user_story_3_problem.md)). We use Mollie instead.
 
 ## Steps
 
-- connect to "status.stripe.com"
+- connect to "status.mollie.com" (`allowed_domains`)
+- the ticket contains the URL `https://status.mollie.com/api/v2/components.json`, because web fetch only follows URLs that appear in the conversation
 - use the web page max. 3 times per ticket
-- make sure there are no incidents reported on the status page. The four categories "Global payments", "Revenue and finance automation", "Stripe core components" and "Banking as a service" need to be up.
+- make sure there are no incidents reported on the status page. The four payment-relevant top-level components "Platform availability", "International payment methods", "Local payment methods" and "Settlements (Payouts)" need status `OPERATIONAL`, and so must their child components. The other components ("App & Customer Service", "Integrations") are ignored.
 - run the web fetch in a safe sandbox
-- integrate the web fetch into the agent for billing issues. 
+- integrate the web fetch into the agent for billing issues.
 - include the guardrails on slide 9
 - ignore privacy concerns for now
-- sample ticket T-2001 needs the status check
+- sample ticket T-2001 needs the status check (payment provider changed from Stripe to Mollie, status URL added to the ticket text)
 - docs: https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool
 
 ## Optional Goal 3.1

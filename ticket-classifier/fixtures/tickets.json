@@ -17,5 +17,10 @@
     "id": "T-1004",
     "customer_id": "1001",
     "text": "This is the fourth time you have charged me twice. I want to talk to a real person today, not a bot. If this is not resolved I will contact my lawyer and dispute every payment with my bank."
+  },
+  {
+    "id": "T-2001",
+    "customer_id": "1001",
+    "text": "I got charged twice again this month, same as before. Before you process a refund, can you check whether Mollie (our payment processor) is reporting any current outage that might explain a duplicate charge on their end? Their status is at https://status.mollie.com/api/v2/components.json"
   }
 ]

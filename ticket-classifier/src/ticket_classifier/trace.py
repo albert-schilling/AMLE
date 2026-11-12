@@ -28,6 +28,18 @@ def log_actions(ticket_id: str, step: int, message: Any) -> None:
             trace_logger.info("%s %s: %s", prefix, label, block.text.strip())
         elif block.type == "tool_use":
             trace_logger.info("%s Action: %s(%s)", prefix, block.name, block.input)
+        elif block.type == "server_tool_use":  # run by Anthropic, already finished
+            trace_logger.info("%s Action: %s(%s)", prefix, block.name, block.input)
+        elif block.type == "web_fetch_tool_result":
+            trace_logger.info("%s Observation: %s", prefix, describe_fetch(block))
+
+
+def describe_fetch(block: Any) -> str:
+    """Short summary of a ``web_fetch`` result block (the page itself is not logged)."""
+    result = block.content
+    if result.type == "web_fetch_tool_result_error":
+        return f"web_fetch failed: {result.error_code}"
+    return f"web_fetch ok: {result.url}"
 
 
 def log_observations(ticket_id: str, step: int, observation: Any) -> None:

@@ -6,7 +6,12 @@ from anthropic import Anthropic
 from .config import get_settings
 from .models import Escalated, Resolved, Ticket, TicketClassification
 from .prompts import SYSTEM_PROMPT, create_prompt
-from .tools import Escalation, lookup_customer, make_escalation_tool
+from .tools import (
+    Escalation,
+    lookup_customer,
+    make_escalation_tool,
+    make_web_fetch_tool,
+)
 from .trace import log_actions, log_final, log_observations
 
 logger = logging.getLogger(__name__)
@@ -51,7 +56,11 @@ def classify(
         max_tokens=settings.max_tokens,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": create_prompt(ticket)}],
-        tools=[lookup_customer, make_escalation_tool(escalation)],
+        tools=[
+            lookup_customer,
+            make_escalation_tool(escalation),
+            make_web_fetch_tool(),
+        ],
         # one tool call per turn: an escalation must see the lookup result first
         tool_choice={"type": "auto", "disable_parallel_tool_use": True},
         output_format=TicketClassification,

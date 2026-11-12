@@ -7,6 +7,7 @@ from anthropic import beta_tool
 from anthropic.lib.tools import BetaFunctionTool
 from pydantic import ValidationError
 
+from .config import get_settings
 from .customers import get_customer
 
 logger = logging.getLogger(__name__)
@@ -57,3 +58,19 @@ def make_escalation_tool(escalation: Escalation) -> BetaFunctionTool[Any]:
         return "Escalation approved. A human will take over this ticket."
 
     return escalate_to_human
+
+
+def make_web_fetch_tool() -> dict[str, Any]:
+    """Anthropic's server-side ``web_fetch`` tool, locked down by guardrails.
+
+    Anthropic runs the fetch (our sandbox); it can only reach ``STATUS_DOMAIN``, at
+    most ``WEB_FETCH_MAX_USES`` times per ticket, and the page size is capped.
+    """
+    settings = get_settings()
+    return {
+        "type": "web_fetch_20250910",
+        "name": "web_fetch",
+        "max_uses": settings.web_fetch_max_uses,
+        "allowed_domains": [settings.status_domain],
+        "max_content_tokens": settings.web_fetch_max_content_tokens,
+    }

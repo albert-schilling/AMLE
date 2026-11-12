@@ -1,6 +1,11 @@
 import json
 
-from ticket_classifier.tools import Escalation, lookup_customer, make_escalation_tool
+from ticket_classifier.tools import (
+    Escalation,
+    lookup_customer,
+    make_escalation_tool,
+    make_web_fetch_tool,
+)
 
 
 def test_lookup_customer_found(customers_file):
@@ -59,3 +64,22 @@ def test_second_escalation_does_not_ask_the_human_again():
     assert asked == ["first"]
     assert escalation.reason == "first"
     assert "Already escalated" in result
+
+
+def test_web_fetch_tool_has_guardrails():
+    tool = make_web_fetch_tool()
+
+    assert tool["type"] == "web_fetch_20250910"
+    assert tool["max_uses"] == 3
+    assert tool["allowed_domains"] == ["status.mollie.com"]
+    assert tool["max_content_tokens"] > 0
+
+
+def test_web_fetch_guardrails_follow_settings(monkeypatch):
+    monkeypatch.setenv("STATUS_DOMAIN", "status.example.com")
+    monkeypatch.setenv("WEB_FETCH_MAX_USES", "1")
+
+    tool = make_web_fetch_tool()
+
+    assert tool["allowed_domains"] == ["status.example.com"]
+    assert tool["max_uses"] == 1

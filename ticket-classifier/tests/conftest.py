@@ -70,6 +70,20 @@ def tool_use(name, **tool_input):
     return SimpleNamespace(type="tool_use", name=name, input=tool_input)
 
 
+def server_tool_use(name, **tool_input):
+    return SimpleNamespace(type="server_tool_use", name=name, input=tool_input)
+
+
+def web_fetch_result(url=None, error_code=None):
+    if error_code:
+        content = SimpleNamespace(
+            type="web_fetch_tool_result_error", error_code=error_code
+        )
+    else:
+        content = SimpleNamespace(type="web_fetch_result", url=url)
+    return SimpleNamespace(type="web_fetch_tool_result", content=content)
+
+
 def message(*blocks, stop_reason="end_turn", parsed_output=None):
     return SimpleNamespace(
         content=list(blocks), stop_reason=stop_reason, parsed_output=parsed_output

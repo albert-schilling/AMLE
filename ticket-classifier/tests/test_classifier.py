@@ -1,5 +1,13 @@
 import pytest
-from conftest import message, observation, text, thinking, tool_use
+from conftest import (
+    message,
+    observation,
+    server_tool_use,
+    text,
+    thinking,
+    tool_use,
+    web_fetch_result,
+)
 
 from ticket_classifier import ClassificationError, TicketClassification, classify
 from ticket_classifier.config import get_settings
@@ -39,6 +47,7 @@ def test_classify_configures_tool_runner(
     kwargs = mock_client.beta.messages.tool_runner.call_args.kwargs
     assert kwargs["tools"][0] is lookup_customer
     assert kwargs["tools"][1].name == "escalate_to_human"
+    assert kwargs["tools"][2]["name"] == "web_fetch"
     assert kwargs["output_format"] is TicketClassification
     assert kwargs["max_iterations"] == 3
     assert kwargs["tool_choice"] == {
@@ -182,3 +191,30 @@ def test_classify_logs_thinking_blocks(
     classify(make_ticket(), mock_client, never)
 
     assert "step 1 Thinking: Customer is angry, check history." in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [
+        (web_fetch_result(url="https://status.mollie.com/x.json"), "web_fetch ok"),
+        (web_fetch_result(error_code="url_not_allowed"), "url_not_allowed"),
+    ],
+)
+def test_classify_logs_server_side_web_fetch(
+    mock_client, runner_returns, make_ticket, caplog, result, expected
+):
+    runner_returns(
+        [
+            message(
+                server_tool_use("web_fetch", url="https://status.mollie.com/x.json"),
+                result,
+                parsed_output=OK,
+            )
+        ]
+    )
+    caplog.set_level("INFO", logger="ticket_classifier.trace")
+
+    classify(make_ticket(), mock_client, never)
+
+    assert "Action: web_fetch" in caplog.text
+    assert expected in caplog.text
