@@ -6,22 +6,22 @@ Split into `build_runner`, `run_loop` (returns final message and `LoopStats`),
 `to_result` (cap and escalation logic, unit-tested alone) and `summarize`.
 `final_record(ticket_id, result, stats)` replaced the seven positional arguments.
 
-## 2. Hidden global settings
+## 2. Settings singleton — kept by choice
 
-`get_settings()` is called inside `prompts`, `tools`, `customers` and `classifier`.
-Every layer reads the environment on its own. This is why tests need the autouse
-cache-clearing fixture.
+`get_settings()` (cached with `@cache`) is the config singleton: read once, used
+from anywhere. Passing `settings` down every layer was considered and rejected: it is
+prop drilling for no real gain. `WEB_FETCH_TOOL` reads it at import on purpose.
 
-Fix: read settings once in `cli.main` and `evals.main`, then pass `settings` (or only
-the needed values) down: `create_prompt(ticket, status_url, payments_url)`,
-`make_fetch_tool(settings)`, `classify(ticket, client, approve, settings, ...)`.
+Costs, accepted:
 
-## 3. API client code lives in the classifier
+- tests clear the cache in the autouse fixture `_isolated_settings`;
+- `conftest.py` sets `ANTHROPIC_API_KEY` before any package import.
 
-`create_client` and `upload_log` are in `classifier.py`, and `cli.py` imports them from
-there. They are API setup, not classification.
+Pure helpers may still take plain values (e.g. a URL) when that reads naturally.
 
-Fix: move them to `client.py`.
+## 3. API client code lives in the classifier — done
+
+`create_client` and `upload_log` moved to `client.py`; their test to `tests/test_client.py`.
 
 ## 4. Two parallel union pairs
 

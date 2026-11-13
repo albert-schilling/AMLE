@@ -75,6 +75,7 @@ Environment variables or `.env`, see [.env.example](.env.example):
 | `batch.py` | classify many tickets, collect failures |
 | `classifier.py` | one ticket → capped agent loop (Claude tool runner) → `TriageResult` (classification or escalation) |
 | `prompts.py` | system and user prompts |
+| `client.py` | Anthropic client, log file upload |
 | `approval.py`, `trace.py`, `logging_config.py` | human approval prompt, trace logging, logger setup |
 | `tools.py` | tools the model can call |
 | `customers.py` | customer data access (swap for a DB later) |

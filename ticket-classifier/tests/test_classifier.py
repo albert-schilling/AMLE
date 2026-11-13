@@ -13,7 +13,7 @@ from conftest import (
 )
 
 from ticket_classifier import ClassificationError, TicketClassification, classify
-from ticket_classifier.classifier import to_result, upload_log
+from ticket_classifier.classifier import to_result
 from ticket_classifier.config import get_settings
 from ticket_classifier.tools import (
     Escalation,
@@ -256,16 +256,6 @@ def test_classify_attaches_log_file_for_the_sandbox(
     ]
     assert {"type": "container_upload", "file_id": "file_123"} in content
     assert "Test ticket" in content[0]["text"]
-
-
-def test_upload_log_returns_the_file_id(mock_client, tmp_path):
-    log = tmp_path / "app.log"
-    log.write_text("x")
-    mock_client.beta.files.upload.return_value.id = "file_9"
-
-    assert upload_log(mock_client, log) == "file_9"
-    name, data, _ = mock_client.beta.files.upload.call_args.kwargs["file"]
-    assert (name, data) == ("app.log", b"x")
 
 
 @pytest.mark.parametrize(

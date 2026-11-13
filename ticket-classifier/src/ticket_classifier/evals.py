@@ -16,7 +16,8 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
-from .classifier import classify, create_client, upload_log
+from .classifier import classify
+from .client import create_client, upload_log
 from .config import get_settings
 from .storage import load_tickets
 from .trace import trace_logger

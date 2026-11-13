@@ -12,7 +12,7 @@ At review time: 104 tests pass, `ruff check` and `ruff format --check` are clean
 | [docs-and-structure.md](docs-and-structure.md) | README, agent files, config checks |
 | [temporary-implementations.md](temporary-implementations.md) | Exercise code, fake data and stand-ins |
 
-Suggested order: CLI crash (correctness 1), README, then split `classify` together
-with passing settings explicitly (architecture 1 and 2).
+Done or decided: CLI crash accepted (correctness 1), `classify` split (architecture 1),
+settings singleton kept (architecture 2). Next: README update (docs-and-structure).
 
 Items already tracked in [../TODO.md](../TODO.md) are only referenced here.

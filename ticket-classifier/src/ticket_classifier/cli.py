@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from .approval import console_approval
 from .batch import classify_all
-from .classifier import create_client, upload_log
+from .client import create_client, upload_log
 from .config import get_settings
 from .logging_config import configure_logging
 from .storage import load_tickets, save_results
