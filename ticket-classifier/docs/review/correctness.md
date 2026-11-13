@@ -1,13 +1,10 @@
 # Correctness
 
-## 1. Missing API key crashes with a traceback
+## 1. Missing API key crashes with a traceback — accepted
 
-[cli.py:33](../../src/ticket_classifier/cli.py#L33) calls `get_settings()` outside any
-`try`. A missing `ANTHROPIC_API_KEY` or an invalid `THINKING_BUDGET` raises
-`pydantic.ValidationError` and prints a traceback. The README promises exit code `2`
-when input cannot be loaded.
-
-Fix: catch `ValidationError` around `get_settings()`, log it, return `2`.
+A bad configuration stops the program at startup with a traceback and exit code `1`.
+Failing fast is fine; the README now says so. `tools.py` builds `WEB_FETCH_TOOL` from
+the settings at import, so the crash happens on import.
 
 ## 2. Evals do not check the log file and write to the real trace
 

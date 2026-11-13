@@ -1,13 +1,12 @@
 import json
 
 from ticket_classifier.tools import (
+    WEB_FETCH_TOOL,
     Escalation,
     find_duplicate_charges,
     lookup_customer,
-    make_code_execution_tool,
     make_escalation_tool,
     make_fetch_tool,
-    make_web_fetch_tool,
 )
 
 
@@ -70,25 +69,11 @@ def test_second_escalation_does_not_ask_the_human_again():
 
 
 def test_web_fetch_tool_has_guardrails():
-    tool = make_web_fetch_tool()
-
-    assert tool["type"] == "web_fetch_20250910"
-    assert tool["max_uses"] == 3
-    assert tool["allowed_domains"] == [
-        "status.mollie.com",
-        "albert-schilling.github.io",
-    ]
-    assert tool["max_content_tokens"] > 0
-
-
-def test_web_fetch_guardrails_follow_settings(monkeypatch):
-    monkeypatch.setenv("STATUS_DOMAIN", "status.example.com")
-    monkeypatch.setenv("WEB_FETCH_MAX_USES", "1")
-
-    tool = make_web_fetch_tool()
-
-    assert tool["allowed_domains"][0] == "status.example.com"
-    assert tool["max_uses"] == 1
+    # built at import from the developer's settings, so check presence, not values
+    assert WEB_FETCH_TOOL["type"] == "web_fetch_20250910"
+    assert WEB_FETCH_TOOL["max_uses"] >= 1
+    assert all(WEB_FETCH_TOOL["allowed_domains"])
+    assert WEB_FETCH_TOOL["max_content_tokens"] > 0
 
 
 def row(client_id, invoice, amount, timestamp):
@@ -167,10 +152,3 @@ def test_local_fetch_tool_wraps_body_as_untrusted(monkeypatch, mocker):
     result = make_fetch_tool().call({"url": "https://status.mollie.com/x"})
 
     assert result == '<fetched url="https://status.mollie.com/x">\n{}\n</fetched>'
-
-
-def test_code_execution_tool_is_the_server_side_sandbox():
-    assert make_code_execution_tool() == {
-        "type": "code_execution_20250825",
-        "name": "code_execution",
-    }

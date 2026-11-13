@@ -1,11 +1,15 @@
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
 
-from ticket_classifier import customers
-from ticket_classifier.config import get_settings
-from ticket_classifier.models import Ticket
+# Before any ticket_classifier import: tools.py reads the settings at import time.
+os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
+
+from ticket_classifier import customers  # noqa: E402
+from ticket_classifier.config import get_settings  # noqa: E402
+from ticket_classifier.models import Ticket  # noqa: E402
 
 CUSTOMERS = {
     "1001": {
@@ -27,10 +31,10 @@ def _isolated_settings(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)  # so no .env is picked up
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()
-    customers.clear_cache()
+    customers.load_customers.cache_clear()
     yield
     get_settings.cache_clear()
-    customers.clear_cache()
+    customers.load_customers.cache_clear()
 
 
 @pytest.fixture

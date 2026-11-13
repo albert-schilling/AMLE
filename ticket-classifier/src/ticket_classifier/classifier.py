@@ -10,10 +10,10 @@ from .config import Settings, get_settings
 from .models import Escalated, Resolved, Ticket, TicketClassification
 from .prompts import SYSTEM_PROMPT, create_prompt
 from .tools import (
+    CODE_EXECUTION_TOOL,
     Escalation,
     find_duplicate_charges,
     lookup_customer,
-    make_code_execution_tool,
     make_escalation_tool,
     make_fetch_tool,
 )
@@ -87,7 +87,7 @@ def build_runner(
             make_escalation_tool(escalation),
             make_fetch_tool(),
             find_duplicate_charges,
-            make_code_execution_tool(),
+            CODE_EXECUTION_TOOL,
         ],
         # one tool call per turn: an escalation must see the lookup result first
         tool_choice={"type": "auto", "disable_parallel_tool_use": True},

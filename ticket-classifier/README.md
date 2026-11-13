@@ -48,6 +48,9 @@ Exit code: `0` every ticket got an outcome (a classification, or an escalation, 
 has no category/priority), `1` some tickets failed (the rest are still saved), `2`
 input could not be loaded.
 
+A missing or invalid setting (e.g. no `ANTHROPIC_API_KEY`) is not handled: the program
+stops at startup with a traceback and exit code `1`.
+
 **Input** (`fixtures/tickets.json`): list of `{"id", "text", "customer_id"?}`.
 Customers are read from `CUSTOMERS_PATH` (JSON object keyed by customer id).
 

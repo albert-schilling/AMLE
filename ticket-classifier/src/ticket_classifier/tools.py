@@ -125,35 +125,27 @@ def make_local_fetch_tool() -> BetaFunctionTool[Any]:
     return web_fetch
 
 
-def make_code_execution_tool() -> dict[str, Any]:
-    """Anthropic's server-side code execution tool (a sandboxed Linux container).
+# Anthropic's server-side code execution tool (a sandboxed Linux container). It has no
+# internet, 5 GiB RAM, 1 CPU and an execution time limit we cannot change. There is no
+# max_uses; the loop cap and the prompt limit how often it runs.
+CODE_EXECUTION_TOOL = {"type": "code_execution_20250825", "name": "code_execution"}
 
-    The container has no internet, 5 GiB RAM, 1 CPU and an execution time limit that
-    we cannot change. The tool has no ``max_uses``; the loop cap and the prompt limit
-    how often it runs.
-    """
-    return {"type": "code_execution_20250825", "name": "code_execution"}
+
+# Anthropic's server-side web_fetch tool, locked down by guardrails. Anthropic runs the
+# fetch (our sandbox); it can only reach STATUS_DOMAIN and PAYMENTS_DOMAIN, at most
+# WEB_FETCH_MAX_USES times per ticket, and the page size is capped. Built at import,
+# so a bad configuration crashes on startup.
+WEB_FETCH_TOOL = {
+    "type": "web_fetch_20250910",
+    "name": "web_fetch",
+    "max_uses": get_settings().web_fetch_max_uses,
+    "allowed_domains": [get_settings().status_domain, get_settings().payments_domain],
+    "max_content_tokens": get_settings().web_fetch_max_content_tokens,
+}
 
 
 def make_fetch_tool() -> dict[str, Any] | BetaFunctionTool[Any]:
     """The fetch tool for ``FETCH_BACKEND``: Anthropic's server tool or our own."""
     if get_settings().fetch_backend == "local":
         return make_local_fetch_tool()
-    return make_web_fetch_tool()
-
-
-def make_web_fetch_tool() -> dict[str, Any]:
-    """Anthropic's server-side ``web_fetch`` tool, locked down by guardrails.
-
-    Anthropic runs the fetch (our sandbox); it can only reach ``STATUS_DOMAIN`` and
-    ``PAYMENTS_DOMAIN``, at most ``WEB_FETCH_MAX_USES`` times per ticket, and the page
-    size is capped.
-    """
-    settings = get_settings()
-    return {
-        "type": "web_fetch_20250910",
-        "name": "web_fetch",
-        "max_uses": settings.web_fetch_max_uses,
-        "allowed_domains": [settings.status_domain, settings.payments_domain],
-        "max_content_tokens": settings.web_fetch_max_content_tokens,
-    }
+    return WEB_FETCH_TOOL

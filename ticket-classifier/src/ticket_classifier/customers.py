@@ -13,10 +13,6 @@ def load_customers(path: Path) -> dict[str, dict]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def clear_cache() -> None:
-    load_customers.cache_clear()
-
-
 def get_customer(customer_id: str) -> Customer | None:
     """Return the customer, or None if unknown.
 

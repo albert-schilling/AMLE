@@ -10,6 +10,7 @@ At review time: 104 tests pass, `ruff check` and `ruff format --check` are clean
 | [architecture.md](architecture.md) | Module boundaries, dependencies, data flow |
 | [readability.md](readability.md) | Naming, duplication, small cleanups |
 | [docs-and-structure.md](docs-and-structure.md) | README, agent files, config checks |
+| [temporary-implementations.md](temporary-implementations.md) | Exercise code, fake data and stand-ins |
 
 Suggested order: CLI crash (correctness 1), README, then split `classify` together
 with passing settings explicitly (architecture 1 and 2).
