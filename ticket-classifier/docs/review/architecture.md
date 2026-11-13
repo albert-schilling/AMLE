@@ -1,21 +1,10 @@
 # Architecture
 
-## 1. `classify` has too many jobs
+## 1. `classify` has too many jobs — done
 
-Already in TODO (design 4). [classifier.py](../../src/ticket_classifier/classifier.py)
-builds the request, drives the loop, counts tokens and time, writes traces and decides
-the outcome.
-
-Concrete proposal:
-
-- `run_loop(...) -> (final_message, LoopStats)` drives the runner and writes step records.
-- `LoopStats` dataclass: `steps`, `input_tokens`, `output_tokens`, `container_ms`.
-- `to_result(final_message, escalation, settings) -> Resolved | Escalated` holds the
-  cap and escalation logic and is testable alone.
-- `final_record(ticket_id, result, stats)` instead of seven positional arguments. Today
-  it is called twice with `True, None, steps, ...`
-  ([classifier.py:134-145](../../src/ticket_classifier/classifier.py#L134-L145)), which
-  is easy to get wrong.
+Split into `build_runner`, `run_loop` (returns final message and `LoopStats`),
+`to_result` (cap and escalation logic, unit-tested alone) and `summarize`.
+`final_record(ticket_id, result, stats)` replaced the seven positional arguments.
 
 ## 2. Hidden global settings
 

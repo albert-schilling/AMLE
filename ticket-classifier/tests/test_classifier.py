@@ -13,9 +13,13 @@ from conftest import (
 )
 
 from ticket_classifier import ClassificationError, TicketClassification, classify
-from ticket_classifier.classifier import upload_log
+from ticket_classifier.classifier import to_result, upload_log
 from ticket_classifier.config import get_settings
-from ticket_classifier.tools import find_duplicate_charges, lookup_customer
+from ticket_classifier.tools import (
+    Escalation,
+    find_duplicate_charges,
+    lookup_customer,
+)
 
 OK = TicketClassification(category="billing", priority="high")
 
@@ -414,3 +418,35 @@ def test_trace_step_lists_all_tool_calls(
         "bash_code_execution",
         "lookup_customer",
     ]
+
+
+def test_to_result_cap_escalates_without_classification():
+    final = message(tool_use("lookup_customer"), stop_reason="tool_use")
+
+    result = to_result(final, Escalation(never), "T-1", max_iterations=6)
+
+    assert result.escalated is True
+    assert result.classification is None
+    assert result.escalation_reason == "Iteration cap reached (6 steps)"
+
+
+def test_to_result_resolved_without_escalation():
+    result = to_result(message(parsed_output=OK), Escalation(never), "T-1", 6)
+
+    assert result.escalated is False
+    assert result.classification == OK
+
+
+def test_to_result_keeps_classification_of_approved_escalation():
+    escalation = Escalation(never, reason="legal threat")
+
+    result = to_result(message(parsed_output=OK), escalation, "T-1", 6)
+
+    assert result.escalated is True
+    assert result.escalation_reason == "legal threat"
+    assert result.classification == OK
+
+
+def test_to_result_raises_when_nothing_parsed():
+    with pytest.raises(ClassificationError, match="T-1.*max_tokens"):
+        to_result(message(stop_reason="max_tokens"), Escalation(never), "T-1", 6)

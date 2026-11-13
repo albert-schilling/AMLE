@@ -15,12 +15,6 @@ bottom so the history stays clear.
    and continues, so a bad API key or rate limit fails each ticket slowly. Abort the
    batch on `AuthenticationError`.
 
-## Design
-
-4. **`classify` has too many jobs** (build request, thinking options, drive loop, log,
-   interpret outcome). Split "run loop" from "turn messages into a result" so the cap
-   logic is testable alone.
-
 ## Open decisions / smaller points
 
 - **One tool call per turn** (`disable_parallel_tool_use`) was added but not yet checked
@@ -54,3 +48,5 @@ bottom so the history stays clear.
   `disable_parallel_tool_use`; see the open point above to verify it in a real run.
 - Rejection path verified on the real API (previously mock-only).
 - PR #2 (agent loop, escalation gate, trace logging, thinking) merged.
+- `classify` split: `build_runner`, `run_loop`, `to_result`, `summarize`; cap logic
+  tested alone via `to_result`.

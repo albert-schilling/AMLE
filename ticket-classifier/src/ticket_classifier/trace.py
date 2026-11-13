@@ -6,9 +6,12 @@ Uses its own logger so the console can show it in a plain format while a log fil
 
 import json
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from .models import Escalated, Resolved
 
 TRACE_LOGGER_NAME = "ticket_classifier.trace"
 trace_logger = logging.getLogger(TRACE_LOGGER_NAME)
@@ -150,24 +153,35 @@ def step_record(
     }
 
 
+@dataclass
+class LoopStats:
+    """Totals of one ticket's agent loop."""
+
+    steps: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    container_ms: int = 0  # upper bound, see ``container_ms_estimate``
+
+    def add_step(self, usage: Any, container_ms: int) -> None:
+        self.steps += 1
+        self.input_tokens += usage.input_tokens
+        self.output_tokens += usage.output_tokens
+        self.container_ms += container_ms
+
+
 def final_record(
-    ticket_id: str,
-    escalated: bool,
-    category: str | None,
-    steps: int,
-    input_tokens: int,
-    output_tokens: int,
-    container_ms_estimate: int,
+    ticket_id: str, result: Resolved | Escalated, stats: LoopStats
 ) -> dict[str, Any]:
     """The last line of a ticket: how it ended."""
+    classification = result.classification
     return {
         "type": "final",
         "timestamp": datetime.now(UTC).isoformat(),
         "ticket_id": ticket_id,
-        "steps": steps,
-        "escalated": escalated,
-        "category": category,
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "container_ms_estimate": container_ms_estimate,
+        "steps": stats.steps,
+        "escalated": result.escalated,
+        "category": classification.category if classification else None,
+        "input_tokens": stats.input_tokens,
+        "output_tokens": stats.output_tokens,
+        "container_ms_estimate": stats.container_ms,
     }

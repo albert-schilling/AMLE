@@ -2,10 +2,11 @@ import logging
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from anthropic import Anthropic
 
-from .config import get_settings
+from .config import Settings, get_settings
 from .models import Escalated, Resolved, Ticket, TicketClassification
 from .prompts import SYSTEM_PROMPT, create_prompt
 from .tools import (
@@ -17,6 +18,7 @@ from .tools import (
     make_fetch_tool,
 )
 from .trace import (
+    LoopStats,
     append_jsonl,
     final_record,
     log_actions,
@@ -56,24 +58,14 @@ def user_content(ticket: Ticket, log_file_id: str | None) -> str | list[dict]:
     ]
 
 
-def classify(
-    ticket: Ticket,
+def build_runner(
     client: Anthropic,
-    approve: Callable[[str], bool],
-    log_file_id: str | None = None,
-) -> Resolved | Escalated:
-    """Run the agent loop for one ticket and log its reasoning trace.
-
-    The loop (reason, call a tool, observe, repeat) is capped at ``max_iterations``;
-    hitting the cap counts as an automatic escalation. ``approve`` is the human
-    gate for ``escalate_to_human``. ``log_file_id`` (an uploaded file) is attached to
-    the prompt so the code execution sandbox can read it.
-    """
-    settings = get_settings()
-    escalation = Escalation(approve)
-
-    logger.info("Classifying ticket %s", ticket.id)
-
+    ticket: Ticket,
+    escalation: Escalation,
+    log_file_id: str | None,
+    settings: Settings,
+) -> Any:
+    """The SDK tool runner for one ticket, with all tools and options set."""
     # Manual extended thinking (budget_tokens) is a legacy mode: it works on Haiku 4.5
     # but models from Claude 4.7 on reject it with a 400 and need adaptive thinking
     # ({"type": "adaptive"} plus an effort level) instead. Haiku 4.5 does not think
@@ -84,8 +76,7 @@ def classify(
         if settings.thinking_budget
         else {}
     )
-
-    runner = client.beta.messages.tool_runner(
+    return client.beta.messages.tool_runner(
         model=settings.model,
         max_iterations=settings.max_iterations,
         max_tokens=settings.max_tokens,
@@ -104,71 +95,86 @@ def classify(
         **thinking,
     )
 
-    steps = input_tokens = output_tokens = container_ms = 0
+
+def run_loop(runner: Any, ticket_id: str, settings: Settings) -> tuple[Any, LoopStats]:
+    """Drive the runner to the end; log and record every step.
+
+    Returns the final message and the totals of the run.
+    """
+    stats = LoopStats()
     started = time.perf_counter()  # a step = model call + tool run (incl. approval)
     for step, message in enumerate(runner, start=1):
-        steps = step
-        input_tokens += message.usage.input_tokens
-        output_tokens += message.usage.output_tokens
-        log_actions(ticket.id, step, message)  # before tools run (and may prompt)
+        log_actions(ticket_id, step, message)  # before tools run (and may prompt)
         # the runner caches this response, so tools run once
         observation = runner.generate_tool_call_response()
-        log_observations(ticket.id, step, observation)
+        log_observations(ticket_id, step, observation)
         duration_ms = round((time.perf_counter() - started) * 1000)
         record = step_record(
-            ticket.id, step, settings.model, message, observation, duration_ms
+            ticket_id, step, settings.model, message, observation, duration_ms
         )
-        container_ms += record["container_ms_estimate"]
+        stats.add_step(message.usage, record["container_ms_estimate"])
         append_jsonl(settings.trace_file, record)
         started = time.perf_counter()
+    return runner.until_done(), stats
 
-    final = runner.until_done()
-    tokens = (
-        f", tokens in/out={input_tokens}/{output_tokens}, container<={container_ms}ms"
-    )
-    logger.debug("Ticket %s finished, stop_reason=%s", ticket.id, final.stop_reason)
 
-    if final.stop_reason == "tool_use":  # the model still wanted tools: cap reached
-        reason = f"Iteration cap reached ({settings.max_iterations} steps)"
-        log_final(ticket.id, f"ESCALATED automatically - {reason}{tokens}")
-        append_jsonl(
-            settings.trace_file,
-            final_record(
-                ticket.id,
-                True,
-                None,
-                steps,
-                input_tokens,
-                output_tokens,
-                container_ms,
-            ),
+def to_result(
+    final: Any, escalation: Escalation, ticket_id: str, max_iterations: int
+) -> Resolved | Escalated:
+    """Turn the final message into a triage result.
+
+    The model still wanting tools means the cap was hit: an automatic escalation
+    without a classification. Raises ``ClassificationError`` if nothing was parsed.
+    """
+    if final.stop_reason == "tool_use":
+        return Escalated(
+            escalation_reason=f"Iteration cap reached ({max_iterations} steps)"
         )
-        return Escalated(escalation_reason=reason)
-
     if final.parsed_output is None:
         raise ClassificationError(
-            f"No parsed classification for ticket {ticket.id} "
+            f"No parsed classification for ticket {ticket_id} "
             f"(stop_reason={final.stop_reason})"
         )
-
-    result: Resolved | Escalated
     if escalation.reason is not None:
-        result = Escalated(
+        return Escalated(
             escalation_reason=escalation.reason, classification=final.parsed_output
         )
-    else:
-        result = Resolved(classification=final.parsed_output)
-    log_final(ticket.id, f"{final.parsed_output}, escalated={result.escalated}{tokens}")
-    append_jsonl(
-        settings.trace_file,
-        final_record(
-            ticket.id,
-            result.escalated,
-            final.parsed_output.category,
-            steps,
-            input_tokens,
-            output_tokens,
-            container_ms,
-        ),
+    return Resolved(classification=final.parsed_output)
+
+
+def summarize(result: Resolved | Escalated, stats: LoopStats) -> str:
+    """One line for the trace log: the outcome plus token and container totals."""
+    totals = (
+        f"tokens in/out={stats.input_tokens}/{stats.output_tokens}, "
+        f"container<={stats.container_ms}ms"
     )
+    if result.classification is None:  # only the cap escalates without one
+        return f"ESCALATED automatically - {result.escalation_reason}, {totals}"
+    return f"{result.classification}, escalated={result.escalated}, {totals}"
+
+
+def classify(
+    ticket: Ticket,
+    client: Anthropic,
+    approve: Callable[[str], bool],
+    log_file_id: str | None = None,
+) -> Resolved | Escalated:
+    """Run the agent loop for one ticket and log its reasoning trace.
+
+    The loop (reason, call a tool, observe, repeat) is capped at ``max_iterations``;
+    hitting the cap counts as an automatic escalation. ``approve`` is the human
+    gate for ``escalate_to_human``. ``log_file_id`` (an uploaded file) is attached to
+    the prompt so the code execution sandbox can read it.
+    """
+    settings = get_settings()
+    escalation = Escalation(approve)
+    logger.info("Classifying ticket %s", ticket.id)
+
+    runner = build_runner(client, ticket, escalation, log_file_id, settings)
+    final, stats = run_loop(runner, ticket.id, settings)
+    logger.debug("Ticket %s finished, stop_reason=%s", ticket.id, final.stop_reason)
+
+    result = to_result(final, escalation, ticket.id, settings.max_iterations)
+    log_final(ticket.id, summarize(result, stats))
+    append_jsonl(settings.trace_file, final_record(ticket.id, result, stats))
     return result
