@@ -62,3 +62,48 @@ per step, even if you haven't gotten to pulling an answer back out of the file y
 that the query step is missing rather than skipping past it silently. The full-batch run
 matters more than a polished summary format.
 (Coaches: see the coaches' page "Contingency plans" for exactly what to prioritise.)
+
+## Answer from the saved log
+
+Question: which step was slowest? Asked of `output/trace.jsonl` after the full batch
+(8 tickets, 13 steps), without re-running anything.
+
+```
+python3 -c "import json;s=[r for r in map(json.loads,open('output/trace.jsonl')) if r['type']=='step'];m=max(s,key=lambda r:r['duration_ms']);print(m['ticket_id'],m['step'],m['duration_ms'])"
+```
+
+Result: `T-2001 3 27126`, so ticket T-2001, step 3, 27.1 s. The step time includes the wait
+for human approval, so this may be the approval prompt.
+
+### The same with grep and awk
+
+Each line is one JSON object, so `grep` works on it. These rely on the `": "` spacing
+that `json.dumps` writes.
+
+Errored steps (`-c` counts matching lines):
+
+```
+grep -c '"errored": true' output/trace.jsonl
+```
+
+Escalated tickets (only `final` lines hold the outcome):
+
+```
+grep '"type": "final"' output/trace.jsonl | grep '"escalated": true'
+```
+
+Three slowest steps (`-o` prints only the match, `sort -n` sorts by number):
+
+```
+grep -o '"duration_ms": [0-9]*' output/trace.jsonl | sort -t: -k2 -n | tail -3
+```
+
+Ticket with the most total time (`awk` sums the step times per ticket):
+
+```
+grep -oE '"ticket_id": "[^"]*"|"duration_ms": [0-9]*' output/trace.jsonl \
+  | awk -F': ' '/ticket_id/{id=$2} /duration_ms/{t[id]+=$2} END{for(i in t)print t[i], i}' \
+  | sort -n | tail -1
+```
+
+Result: `39314 "T-2001"`, so T-2001 used 39.3 s in total (approval wait included).
