@@ -99,9 +99,12 @@ def code_result(stdout="", return_code=0, error_code=None):
     return SimpleNamespace(type="bash_code_execution_tool_result", content=content)
 
 
-def message(*blocks, stop_reason="end_turn", parsed_output=None):
+def message(*blocks, stop_reason="end_turn", parsed_output=None, usage=(0, 0)):
     return SimpleNamespace(
-        content=list(blocks), stop_reason=stop_reason, parsed_output=parsed_output
+        content=list(blocks),
+        stop_reason=stop_reason,
+        parsed_output=parsed_output,
+        usage=SimpleNamespace(input_tokens=usage[0], output_tokens=usage[1]),
     )
 
 

@@ -12,6 +12,9 @@ it gives a final answer. Tools: `lookup_customer` (read-only) and `escalate_to_h
 - Every Thought, Action and Observation is logged (logger `ticket_classifier.trace`,
   plain format on the console), followed by the final answer. Set `LOG_FILE` to also
   write it, with timestamps, to a file (one record per line, newlines written as `\n`).
+- Every step is also appended as one JSON line to `TRACE_FILE` (default
+  `output/trace.jsonl`): ticket id, step, tool calls (name and input), observation, `duration_ms`,
+  `errored`, token counts, `container_ms_estimate` (step time of code execution steps, an upper bound). A `final` line closes each ticket.
 - The model may make only one tool call per turn, so an escalation can use the customer
   lookup result.
 - `escalate_to_human` only counts after a human types `y` at the console prompt. A
@@ -59,7 +62,7 @@ Customers are read from `CUSTOMERS_PATH` (JSON object keyed by customer id).
 
 Environment variables or `.env`, see [.env.example](.env.example):
 `ANTHROPIC_API_KEY` (required), `MODEL`, `MAX_TOKENS`, `MAX_ITERATIONS`, `THINKING_BUDGET`, `LOG_LEVEL`,
-`LOG_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`.
+`LOG_FILE`, `TRACE_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`.
 
 ## Layout
 

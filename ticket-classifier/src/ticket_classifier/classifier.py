@@ -1,4 +1,5 @@
 import logging
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -15,7 +16,14 @@ from .tools import (
     make_escalation_tool,
     make_fetch_tool,
 )
-from .trace import log_actions, log_final, log_observations
+from .trace import (
+    append_jsonl,
+    final_record,
+    log_actions,
+    log_final,
+    log_observations,
+    step_record,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,17 +104,45 @@ def classify(
         **thinking,
     )
 
+    steps = input_tokens = output_tokens = container_ms = 0
+    started = time.perf_counter()  # a step = model call + tool run (incl. approval)
     for step, message in enumerate(runner, start=1):
+        steps = step
+        input_tokens += message.usage.input_tokens
+        output_tokens += message.usage.output_tokens
         log_actions(ticket.id, step, message)  # before tools run (and may prompt)
         # the runner caches this response, so tools run once
-        log_observations(ticket.id, step, runner.generate_tool_call_response())
+        observation = runner.generate_tool_call_response()
+        log_observations(ticket.id, step, observation)
+        duration_ms = round((time.perf_counter() - started) * 1000)
+        record = step_record(
+            ticket.id, step, settings.model, message, observation, duration_ms
+        )
+        container_ms += record["container_ms_estimate"]
+        append_jsonl(settings.trace_file, record)
+        started = time.perf_counter()
 
     final = runner.until_done()
+    tokens = (
+        f", tokens in/out={input_tokens}/{output_tokens}, container<={container_ms}ms"
+    )
     logger.debug("Ticket %s finished, stop_reason=%s", ticket.id, final.stop_reason)
 
     if final.stop_reason == "tool_use":  # the model still wanted tools: cap reached
         reason = f"Iteration cap reached ({settings.max_iterations} steps)"
-        log_final(ticket.id, f"ESCALATED automatically - {reason}")
+        log_final(ticket.id, f"ESCALATED automatically - {reason}{tokens}")
+        append_jsonl(
+            settings.trace_file,
+            final_record(
+                ticket.id,
+                True,
+                None,
+                steps,
+                input_tokens,
+                output_tokens,
+                container_ms,
+            ),
+        )
         return Escalated(escalation_reason=reason)
 
     if final.parsed_output is None:
@@ -122,5 +158,17 @@ def classify(
         )
     else:
         result = Resolved(classification=final.parsed_output)
-    log_final(ticket.id, f"{final.parsed_output}, escalated={result.escalated}")
+    log_final(ticket.id, f"{final.parsed_output}, escalated={result.escalated}{tokens}")
+    append_jsonl(
+        settings.trace_file,
+        final_record(
+            ticket.id,
+            result.escalated,
+            final.parsed_output.category,
+            steps,
+            input_tokens,
+            output_tokens,
+            container_ms,
+        ),
+    )
     return result

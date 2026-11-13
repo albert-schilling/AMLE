@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from conftest import (
     code_result,
@@ -106,6 +108,7 @@ def test_classify_logs_full_trace(mock_client, runner_returns, make_ticket, capl
     classify(make_ticket(), mock_client, never)
 
     out = caplog.text
+    assert "tokens in/out=" in out
     assert "Thought: Need the customer." in out
     assert "Action: lookup_customer({'customer_id': '1001'})" in out
     assert "Observation: Alice, pro plan" in out
@@ -286,3 +289,128 @@ def test_classify_logs_code_execution(
 
     assert "Action: bash_code_execution" in caplog.text
     assert expected in caplog.text
+
+
+def read_trace(path):
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
+def test_classify_writes_jsonl_trace(
+    mock_client, runner_returns, make_ticket, tmp_path, monkeypatch
+):
+    trace_file = tmp_path / "trace.jsonl"
+    monkeypatch.setenv("TRACE_FILE", str(trace_file))
+    runner_returns(
+        [
+            message(
+                text("Need the customer."),
+                tool_use("lookup_customer", customer_id="1001"),
+                stop_reason="tool_use",
+                usage=(100, 20),
+            ),
+            message(parsed_output=OK, usage=(150, 30)),
+        ],
+        [observation("Alice, pro plan"), None],
+    )
+
+    classify(make_ticket(), mock_client, never)
+
+    first, second, final = read_trace(trace_file)
+    assert first["type"] == "step"
+    assert first["ticket_id"] == "T-1"
+    assert first["step"] == 1
+    assert first["thought"] == "Need the customer."
+    assert first["tool_calls"] == [
+        {"name": "lookup_customer", "input": {"customer_id": "1001"}}
+    ]
+    assert first["observation"] == "Alice, pro plan"
+    assert first["errored"] is False
+    assert first["container_ms_estimate"] == 0
+    assert isinstance(first["duration_ms"], int)
+    assert (first["input_tokens"], first["output_tokens"]) == (100, 20)
+    assert second["tool_calls"] == []
+    assert second["observation"] is None
+    assert final["type"] == "final"
+    assert final["steps"] == 2
+    assert final["escalated"] is False
+    assert final["category"] == "billing"
+    assert (final["input_tokens"], final["output_tokens"]) == (250, 50)
+
+
+def test_trace_marks_errored_steps(
+    mock_client, runner_returns, make_ticket, tmp_path, monkeypatch
+):
+    trace_file = tmp_path / "trace.jsonl"
+    monkeypatch.setenv("TRACE_FILE", str(trace_file))
+    failed = {"content": [{"type": "tool_result", "content": "boom", "is_error": True}]}
+    runner_returns(
+        [
+            message(
+                tool_use("lookup_customer", customer_id="1001"), stop_reason="tool_use"
+            ),
+            message(
+                server_tool_use("code_execution", command="cat x"),
+                code_result(error_code="unavailable"),
+                stop_reason="tool_use",
+            ),
+            message(parsed_output=OK),
+        ],
+        [failed, None, None],
+    )
+
+    classify(make_ticket(), mock_client, never)
+
+    client_step, server_step, answer, final = read_trace(trace_file)
+    assert client_step["errored"] is True
+    assert [call["name"] for call in server_step["tool_calls"]] == ["code_execution"]
+    assert server_step["errored"] is True
+    assert server_step["container_ms_estimate"] == server_step["duration_ms"]
+    assert final["container_ms_estimate"] == server_step["duration_ms"]
+    assert answer["errored"] is False
+
+
+def test_trace_final_line_for_cap_escalation(
+    mock_client, runner_returns, make_ticket, tmp_path, monkeypatch
+):
+    trace_file = tmp_path / "trace.jsonl"
+    monkeypatch.setenv("TRACE_FILE", str(trace_file))
+    runner_returns(
+        [
+            message(
+                tool_use("lookup_customer", customer_id="1001"), stop_reason="tool_use"
+            )
+        ],
+        [observation("{}")],
+    )
+
+    classify(make_ticket(), mock_client, never)
+
+    final = read_trace(trace_file)[-1]
+    assert final["escalated"] is True
+    assert final["category"] is None
+
+
+def test_trace_step_lists_all_tool_calls(
+    mock_client, runner_returns, make_ticket, tmp_path, monkeypatch
+):
+    trace_file = tmp_path / "trace.jsonl"
+    monkeypatch.setenv("TRACE_FILE", str(trace_file))
+    runner_returns(
+        [
+            message(
+                server_tool_use("bash_code_execution", command="ls"),
+                tool_use("lookup_customer", customer_id="1001"),
+                stop_reason="tool_use",
+            ),
+            message(parsed_output=OK),
+        ],
+        [observation("Alice"), None],
+    )
+
+    classify(make_ticket(), mock_client, never)
+
+    step = read_trace(trace_file)[0]
+    assert [call["name"] for call in step["tool_calls"]] == [
+        "bash_code_execution",
+        "lookup_customer",
+    ]
