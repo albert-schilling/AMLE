@@ -6,7 +6,13 @@ from typing import Any
 from anthropic import Anthropic
 
 from .config import Settings, get_settings
-from .models import Escalated, Resolved, Ticket, TicketClassification
+from .models import (
+    ClassifiedTicket,
+    EscalatedTicket,
+    ResolvedTicket,
+    Ticket,
+    TicketClassification,
+)
 from .prompts import SYSTEM_PROMPT, create_prompt
 from .tools import (
     CODE_EXECUTION_TOOL,
@@ -105,38 +111,43 @@ def run_loop(runner: Any, ticket_id: str, settings: Settings) -> tuple[Any, Loop
 
 
 def to_result(
-    final: Any, escalation: Escalation, ticket_id: str, max_iterations: int
-) -> Resolved | Escalated:
-    """Turn the final message into a triage result.
+    final: Any, escalation: Escalation, ticket: Ticket, max_iterations: int
+) -> ClassifiedTicket:
+    """Turn the final message into the ticket's result row.
 
     The model still wanting tools means the cap was hit: an automatic escalation
     without a classification. Raises ``ClassificationError`` if nothing was parsed.
     """
+    ids = {"ticket_id": ticket.id, "customer_id": ticket.customer_id}
     if final.stop_reason == "tool_use":
-        return Escalated(
-            escalation_reason=f"Iteration cap reached ({max_iterations} steps)"
+        return EscalatedTicket(
+            **ids, escalation_reason=f"Iteration cap reached ({max_iterations} steps)"
         )
     if final.parsed_output is None:
         raise ClassificationError(
-            f"No parsed classification for ticket {ticket_id} "
+            f"No parsed classification for ticket {ticket.id} "
             f"(stop_reason={final.stop_reason})"
         )
+    classification = final.parsed_output.model_dump()
     if escalation.reason is not None:
-        return Escalated(
-            escalation_reason=escalation.reason, classification=final.parsed_output
+        return EscalatedTicket(
+            **ids, **classification, escalation_reason=escalation.reason
         )
-    return Resolved(classification=final.parsed_output)
+    return ResolvedTicket(**ids, **classification)
 
 
-def summarize(result: Resolved | Escalated, stats: LoopStats) -> str:
+def summarize(result: ClassifiedTicket, stats: LoopStats) -> str:
     """One line for the trace log: the outcome plus token and container totals."""
     totals = (
         f"tokens in/out={stats.input_tokens}/{stats.output_tokens}, "
         f"container<={stats.container_ms}ms"
     )
-    if result.classification is None:  # only the cap escalates without one
+    if result.category is None:  # only the cap escalates without a classification
         return f"ESCALATED automatically - {result.escalation_reason}, {totals}"
-    return f"{result.classification}, escalated={result.escalated}, {totals}"
+    return (
+        f"category={result.category} priority={result.priority}, "
+        f"escalated={result.escalated}, {totals}"
+    )
 
 
 def classify(
@@ -144,7 +155,7 @@ def classify(
     client: Anthropic,
     approve: Callable[[str], bool],
     log_file_id: str | None = None,
-) -> Resolved | Escalated:
+) -> ClassifiedTicket:
     """Run the agent loop for one ticket and log its reasoning trace.
 
     The loop (reason, call a tool, observe, repeat) is capped at ``max_iterations``;
@@ -160,7 +171,7 @@ def classify(
     final, stats = run_loop(runner, ticket.id, settings)
     logger.debug("Ticket %s finished, stop_reason=%s", ticket.id, final.stop_reason)
 
-    result = to_result(final, escalation, ticket.id, settings.max_iterations)
+    result = to_result(final, escalation, ticket, settings.max_iterations)
     log_final(ticket.id, summarize(result, stats))
-    append_jsonl(settings.trace_file, final_record(ticket.id, result, stats))
+    append_jsonl(settings.trace_file, final_record(result, stats))
     return result

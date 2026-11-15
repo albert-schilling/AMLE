@@ -21,26 +21,9 @@ class TicketClassification(BaseModel):
     priority: Priority
 
 
-class Resolved(BaseModel):
+class ResolvedTicket(BaseModel):
     """Triage ended with a classification and no escalation."""
 
-    escalated: Literal[False] = False
-    classification: TicketClassification
-
-
-class Escalated(BaseModel):
-    """Triage ended with a human takeover; a classification may still exist."""
-
-    escalated: Literal[True] = True
-    escalation_reason: str
-    classification: TicketClassification | None = None
-
-
-# Tagged union on ``escalated``: impossible states cannot be built or loaded.
-TriageResult = Annotated[Resolved | Escalated, Field(discriminator="escalated")]
-
-
-class ResolvedTicket(BaseModel):
     ticket_id: str
     customer_id: str | None = None
     category: Category
@@ -50,6 +33,8 @@ class ResolvedTicket(BaseModel):
 
 
 class EscalatedTicket(BaseModel):
+    """Triage ended with a human takeover; a classification may still exist."""
+
     ticket_id: str
     customer_id: str | None = None
     category: Category | None = None  # absent when escalated without a classification
@@ -58,6 +43,7 @@ class EscalatedTicket(BaseModel):
     escalation_reason: str
 
 
+# Tagged union on ``escalated``: impossible states cannot be built or loaded.
 ClassifiedTicket = Annotated[
     ResolvedTicket | EscalatedTicket, Field(discriminator="escalated")
 ]

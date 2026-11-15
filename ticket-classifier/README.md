@@ -73,7 +73,7 @@ Environment variables or `.env`, see [.env.example](.env.example):
 | --- | --- |
 | `cli.py` | argument parsing, exit codes |
 | `batch.py` | classify many tickets, collect failures |
-| `classifier.py` | one ticket → capped agent loop (Claude tool runner) → `TriageResult` (classification or escalation) |
+| `classifier.py` | one ticket → capped agent loop (Claude tool runner) → result row (`ResolvedTicket` or `EscalatedTicket`) |
 | `prompts.py` | system and user prompts |
 | `client.py` | Anthropic client, log file upload |
 | `approval.py`, `trace.py`, `logging_config.py` | human approval prompt, trace logging, logger setup |

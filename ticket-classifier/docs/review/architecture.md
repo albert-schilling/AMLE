@@ -23,14 +23,11 @@ Pure helpers may still take plain values (e.g. a URL) when that reads naturally.
 
 `create_client` and `upload_log` moved to `client.py`; their test to `tests/test_client.py`.
 
-## 4. Two parallel union pairs
+## 4. Two parallel union pairs — done
 
-`Resolved / Escalated` (domain result) and `ResolvedTicket / EscalatedTicket` (output
-row) hold almost the same data, and `batch.to_classified_ticket` maps one to the other.
-
-Options: keep both if the output schema must stay independent of the domain model;
-otherwise one output model built from `TriageResult` with `ticket_id` and
-`customer_id` added, and `to_classified_ticket` goes away.
+The domain pair `Resolved / Escalated` and `TriageResult` are gone. `classify` returns
+the output row (`ResolvedTicket | EscalatedTicket`) directly, so
+`batch.to_classified_ticket` went away. The results JSON is unchanged.
 
 ## 5. Evals parse log text
 

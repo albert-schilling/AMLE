@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .models import Escalated, Resolved
+from .models import ClassifiedTicket
 
 TRACE_LOGGER_NAME = "ticket_classifier.trace"
 trace_logger = logging.getLogger(TRACE_LOGGER_NAME)
@@ -169,18 +169,15 @@ class LoopStats:
         self.container_ms += container_ms
 
 
-def final_record(
-    ticket_id: str, result: Resolved | Escalated, stats: LoopStats
-) -> dict[str, Any]:
+def final_record(result: ClassifiedTicket, stats: LoopStats) -> dict[str, Any]:
     """The last line of a ticket: how it ended."""
-    classification = result.classification
     return {
         "type": "final",
         "timestamp": datetime.now(UTC).isoformat(),
-        "ticket_id": ticket_id,
+        "ticket_id": result.ticket_id,
         "steps": stats.steps,
         "escalated": result.escalated,
-        "category": classification.category if classification else None,
+        "category": result.category,
         "input_tokens": stats.input_tokens,
         "output_tokens": stats.output_tokens,
         "container_ms_estimate": stats.container_ms,

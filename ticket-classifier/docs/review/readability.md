@@ -9,9 +9,8 @@
 
 - `status_domain` + `status_url` and `payments_domain` + `payments_url` repeat the same
   host. Derive the domain with `urlsplit(url).hostname`.
-- [batch.py:26-43](../../src/ticket_classifier/batch.py#L26-L43): `to_classified_ticket`
-  computes `category` / `priority`, then the resolved branch ignores them and reads
-  `triage.classification` again. Use one way.
+- ~~`to_classified_ticket` reads the classification two ways~~ — gone with
+  architecture item 4.
 - [trace.py](../../src/ticket_classifier/trace.py):
   - the `tool_use` and `server_tool_use` branches in `log_actions` are identical; merge.
   - server result handling (`web_fetch_tool_result`, code results) is repeated in
