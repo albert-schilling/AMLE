@@ -2,6 +2,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
+from anthropic import Anthropic
+from langchain_protocol import TypedDict
 from pydantic import BaseModel, ConfigDict, Field
 
 Category = Literal["billing", "technical", "account", "other"]
@@ -49,6 +51,17 @@ ClassifiedTicket = Annotated[
 ]
 
 
+class NotEscalated(BaseModel):
+    escalated: Literal[False] = False
+
+
+class Escalated(BaseModel):
+    escalated: Literal[True] = True
+    escalation_reason: str
+
+
+Escalation = Annotated[NotEscalated | Escalated, Field(discriminator="escalated")]
+
 Product = Literal["Wendel", "Pip", "Brio"]
 
 
@@ -72,3 +85,25 @@ class Payment(BaseModel):
     invoice_number: str
     amount: Decimal
     timestamp: datetime
+
+
+def combine_responses(left: list[str], right: list[str]) -> list[str]:
+    """left and right are lists of outputs from previous nodes"""
+    return left + right
+
+
+class TriageState(TypedDict, total=False):
+    classification: TicketClassification | None
+    """The classification assigned to this ticket."""
+    client: Anthropic
+    """The Anthropic client used for this triage session."""
+    escalation: Escalation = NotEscalated()
+    """The escalation status of this ticket."""
+    customer: Customer | None
+    """The customer associated with this ticket."""
+    last_updated_by: str | None
+    """The identifier of the last node that updated this state."""
+    responses: Annotated[list[str], combine_responses] = []
+    """List of responses accumulated across nodes."""
+    ticket: Ticket
+    """The ticket being processed in this run."""

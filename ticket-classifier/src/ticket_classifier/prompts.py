@@ -3,8 +3,9 @@ from .models import Ticket
 
 # The system prompt is built from one block per feature, so a user story touches one
 # block. Order matters little for the model, but keep the untrusted-input rules last.
-ROLE = (
-    "You are a support ticket triage assistant. "
+ROLE = "You are a support ticket triage assistant. "
+
+CATEGORY = (
     "Categories: billing (charges, refunds, invoices), technical (bugs, errors, "
     "outages), account (profile, login, settings), other."
 )
@@ -65,12 +66,13 @@ UNTRUSTED_TICKET = (
 SYSTEM_PROMPT = " ".join(
     [
         ROLE,
+        CATEGORY,
         PRIORITY,
-        CUSTOMER_LOOKUP,
-        ESCALATION,
-        STATUS_CHECK,
-        DUPLICATE_CHECK,
-        LOG_ANALYSIS,
+        # CUSTOMER_LOOKUP,
+        # ESCALATION,
+        # STATUS_CHECK,
+        # DUPLICATE_CHECK,
+        # LOG_ANALYSIS,
         UNTRUSTED_PAGES,
         TRACE_STYLE,
         UNTRUSTED_TICKET,

@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 
 from anthropic import Anthropic, APIError
 
-from .classifier import ClassificationError, classify
-from .models import ClassifiedTicket, Ticket
+from .classifier import ClassificationError
+from .graph import TriageState, workflow
+from .models import ClassifiedTicket, ResolvedTicket, Ticket
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,27 @@ def classify_all(
     batch = BatchResult()
     for ticket in tickets:
         try:
-            result = classify(ticket, client, approve, log_file_id)
+            # result = classify(ticket, client, approve, log_file_id)
+            state: TriageState = TriageState(
+                client=client,
+                ticket=ticket,
+            )
+
+            logger.info("Invoking workflow for ticket %s", ticket.id)
+            result: TriageState = workflow.invoke(state)
+
+            classified_ticket = ResolvedTicket(
+                ticket_id=ticket.id,
+                customer_id=result["customer"].id if result["customer"] else None,
+                category=result["classification"].category,
+                priority=result["classification"].priority,
+            )
+
         except (ClassificationError, APIError) as error:
             batch.failed.append(ticket.id)
             logger.error("Ticket %s failed: %s", ticket.id, error)
             continue
 
-        logger.info("Ticket %s done, escalated=%s", ticket.id, result.escalated)
-        batch.classified.append(result)
+        logger.info("Ticket %s done, result=%s", ticket.id, result["classification"])
+        batch.classified.append(classified_ticket)
     return batch
