@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from .classifier import classify
-from .client import create_client, upload_log
+from .client import get_client, upload_log
 from .config import get_settings
 from .storage import load_tickets
 from .trace import trace_logger
@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = get_settings()
     tickets = {ticket.id: ticket for ticket in load_tickets(settings.tickets_path)}
-    client = create_client()
+    client = get_client()
     log_file_id = upload_log(client, settings.log_path)
 
     collector = TraceCollector()

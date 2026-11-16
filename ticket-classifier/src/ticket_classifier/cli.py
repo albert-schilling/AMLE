@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from .approval import console_approval
 from .batch import classify_all
-from .client import create_client, upload_log
+from .client import get_client, upload_log
 from .config import get_settings
 from .logging_config import configure_logging
 from .storage import load_tickets, save_results
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
 
     logger.info("Loaded %d tickets from %s", len(tickets), tickets_path)
 
-    client = create_client()
+    client = get_client()
     log_file_id = None
     if settings.log_path.exists():
         try:
@@ -53,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
                 "Cannot upload %s, continuing without it: %s", settings.log_path, error
             )
 
-    batch = classify_all(tickets, client, console_approval, log_file_id)
+    batch = classify_all(tickets, console_approval, log_file_id)
     save_results(batch.classified, settings.results_path)
     logger.info(
         "Classified %d/%d tickets, results in %s",

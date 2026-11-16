@@ -2,7 +2,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from anthropic import Anthropic
 from langchain_protocol import TypedDict
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -95,8 +94,6 @@ def combine_responses(left: list[str], right: list[str]) -> list[str]:
 class TriageState(TypedDict, total=False):
     classification: TicketClassification | None
     """The classification assigned to this ticket."""
-    client: Anthropic
-    """The Anthropic client used for this triage session."""
     escalation: Escalation = NotEscalated()
     """The escalation status of this ticket."""
     customer: Customer | None

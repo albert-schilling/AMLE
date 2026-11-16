@@ -2,11 +2,12 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from anthropic import Anthropic, APIError
+from anthropic import APIError
 
 from .classifier import ClassificationError
 from .graph import TriageState, workflow
 from .models import ClassifiedTicket, ResolvedTicket, Ticket
+from .trace_graph import log_action
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,6 @@ class BatchResult:
 
 def classify_all(
     tickets: list[Ticket],
-    client: Anthropic,
     approve: Callable[[str], bool],
     log_file_id: str | None = None,
 ) -> BatchResult:
@@ -27,14 +27,24 @@ def classify_all(
     batch = BatchResult()
     for ticket in tickets:
         try:
-            # result = classify(ticket, client, approve, log_file_id)
             state: TriageState = TriageState(
-                client=client,
                 ticket=ticket,
             )
 
             logger.info("Invoking workflow for ticket %s", ticket.id)
-            result: TriageState = workflow.invoke(state)
+            # result: TriageState = workflow.invoke(state)
+
+            result: TriageState = state
+
+            # streaming updates from the workflow
+            for mode, data in workflow.stream(state, stream_mode=["updates", "values"]):
+                if mode == "updates":
+                    for node_name, state_updates in data.items():
+                        log_action(node_name, "state updated", state_updates)
+                else:  # "values": full state after each step
+                    result = data
+
+            log_action("end", "workflow finished", result)
 
             classified_ticket = ResolvedTicket(
                 ticket_id=ticket.id,

@@ -1,3 +1,4 @@
+from ticket_classifier.client import get_client
 from ticket_classifier.config import get_settings
 from ticket_classifier.graph import TriageState
 from ticket_classifier.models import Customer, Ticket, TicketClassification
@@ -18,7 +19,7 @@ def create_prompt(customer: Customer | None, ticket: Ticket) -> str:
 def node_triage(state: TriageState) -> TriageState:
     settings = get_settings()
 
-    client = state["client"]
+    client = get_client()
     customer = state["customer"]
     ticket = state["ticket"]
 

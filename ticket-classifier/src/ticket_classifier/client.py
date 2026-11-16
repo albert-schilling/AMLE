@@ -1,6 +1,7 @@
 """Anthropic API setup: the client and file uploads."""
 
 import logging
+from functools import cache
 from pathlib import Path
 
 from anthropic import Anthropic
@@ -10,8 +11,11 @@ from .config import get_settings
 logger = logging.getLogger(__name__)
 
 
-def create_client() -> Anthropic:
-    return Anthropic(api_key=get_settings().anthropic_api_key.get_secret_value())
+@cache
+def get_client() -> Anthropic:
+    settings = get_settings()
+    client = Anthropic(api_key=settings.anthropic_api_key.get_secret_value())
+    return client
 
 
 def upload_log(client: Anthropic, path: Path) -> str:
