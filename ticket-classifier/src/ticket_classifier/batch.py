@@ -32,7 +32,6 @@ def classify_all(
             )
 
             logger.info("Invoking workflow for ticket %s", ticket.id)
-            # result: TriageState = workflow.invoke(state)
 
             result: TriageState = state
 

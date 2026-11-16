@@ -10,7 +10,7 @@ def classified(ticket_id):
 
 
 def patch_pipeline(mocker, batch):
-    mocker.patch("ticket_classifier.cli.create_client")
+    mocker.patch("ticket_classifier.cli.get_client")
     return mocker.patch("ticket_classifier.cli.classify_all", return_value=batch)
 
 
@@ -101,4 +101,4 @@ def test_main_uploads_log_and_passes_file_id(
     main([str(tickets)])
 
     upload.assert_called_once()
-    assert classify_all.call_args.args[3] == "file_1"
+    assert classify_all.call_args.args[2] == "file_1"
