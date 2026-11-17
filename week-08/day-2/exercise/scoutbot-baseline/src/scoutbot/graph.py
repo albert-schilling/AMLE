@@ -50,6 +50,7 @@ class TicketState(TypedDict):
     customer_id: str
     customer: dict
     triage: dict
+    outcome: str
     notes: Annotated[list[str], operator.add]
 
 
@@ -97,8 +98,24 @@ def triage_ticket_node(state: TicketState) -> dict:
     }
 
 
+def wait_for_human_node(state: TicketState) -> dict:
+    """Terminal node: record that a person needs to look at this ticket."""
+    return {"outcome": "waiting_for_human", "notes": ["waiting for a human"]}
+
+
+def mark_handled_node(state: TicketState) -> dict:
+    """Terminal node: record that ScoutBot handled this ticket itself."""
+    return {"outcome": "handled", "notes": ["handled by ScoutBot"]}
+
+
+def route_after_triage(state: TicketState) -> str:
+    """Pick the next node from the triage result: high priority goes to a human."""
+    return "wait_for_human" if state["triage"]["priority"] == "high" else "mark_handled"
+
+
 def build_ticket_graph():
-    """Wire the two nodes up and compile: START to look_up_customer to triage_ticket to END.
+    """Wire the nodes up and compile: look_up_customer to triage_ticket, then a branch on
+    priority to wait_for_human or mark_handled, then END.
 
     `compile()` is also where a checkpointer gets passed, which is how tomorrow's session makes
     this same graph durable. The wiring below does not change to get there, only what is handed
@@ -112,7 +129,15 @@ def build_ticket_graph():
     builder.add_node("triage_ticket", triage_ticket_node)
     builder.add_edge(START, "look_up_customer")
     builder.add_edge("look_up_customer", "triage_ticket")
-    builder.add_edge("triage_ticket", END)
+    builder.add_node("wait_for_human", wait_for_human_node)
+    builder.add_node("mark_handled", mark_handled_node)
+    builder.add_conditional_edges(
+        "triage_ticket",
+        route_after_triage,
+        {"wait_for_human": "wait_for_human", "mark_handled": "mark_handled"},
+    )
+    builder.add_edge("wait_for_human", END)
+    builder.add_edge("mark_handled", END)
     return builder.compile()
 
 
@@ -131,6 +156,7 @@ def initial_state(
         "customer_id": customer_id,
         "customer": {},
         "triage": {},
+        "outcome": "",
         "notes": [],
     }
 

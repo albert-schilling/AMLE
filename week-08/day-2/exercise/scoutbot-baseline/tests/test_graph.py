@@ -16,7 +16,10 @@ from scoutbot.graph import (
     build_ticket_graph,
     initial_state,
     look_up_customer_node,
+    mark_handled_node,
+    route_after_triage,
     run_ticket_graph,
+    wait_for_human_node,
 )
 
 VALID_TRIAGE = {"category": "billing", "priority": "high", "suggested_owner": "billing-team"}
@@ -53,9 +56,8 @@ def test_notes_accumulate_across_nodes_because_of_the_reducer(mock_client):
 
     final = run_ticket_graph("I was charged twice.", customer_id="1001")
 
-    assert len(final["notes"]) == 2
-    assert final["notes"][0] == "looked up 1001: found"
-    assert final["notes"][1] == "triaged as billing/high"
+    assert final["notes"][:2] == ["looked up 1001: found", "triaged as billing/high"]
+    assert len(final["notes"]) == 3
 
 
 @patch("scoutbot.core._client")
@@ -100,6 +102,7 @@ def test_streaming_yields_one_update_per_node_in_order(mock_client):
     assert [name for chunk in chunks for name in chunk] == [
         "look_up_customer",
         "triage_ticket",
+        "wait_for_human",  # VALID_TRIAGE is high priority
     ]
     assert set(chunks[0]["look_up_customer"]) == {"customer", "notes"}
     assert set(chunks[1]["triage_ticket"]) == {"triage", "notes"}
@@ -116,6 +119,22 @@ def test_unknown_customer_still_reaches_the_triage_node(mock_client):
     assert final["customer"] == {"found": False, "customer_id": "does-not-exist"}
     assert final["notes"][0] == "looked up does-not-exist: not found"
     assert final["triage"] == VALID_TRIAGE
+
+
+def test_router_sends_high_priority_to_a_human():
+    assert route_after_triage({"triage": {"priority": "high"}}) == "wait_for_human"
+
+
+def test_router_lets_scoutbot_handle_everything_else():
+    for priority in ("low", "medium"):
+        assert route_after_triage({"triage": {"priority": priority}}) == "mark_handled"
+
+
+def test_terminal_nodes_each_write_their_own_outcome():
+    state = initial_state("Some ticket", customer_id="1001")
+
+    assert wait_for_human_node(state)["outcome"] == "waiting_for_human"
+    assert mark_handled_node(state)["outcome"] == "handled"
 
 
 def test_node_returns_only_the_fields_it_changed():
