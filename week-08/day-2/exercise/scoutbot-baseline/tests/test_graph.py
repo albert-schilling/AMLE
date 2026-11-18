@@ -11,6 +11,7 @@ sees what the first one wrote instead of being handed the ticket text directly.
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from langgraph.checkpoint.memory import InMemorySaver
 from scoutbot.graph import (
     TicketState,
     build_ticket_graph,
@@ -135,6 +136,26 @@ def test_terminal_nodes_each_write_their_own_outcome():
 
     assert wait_for_human_node(state)["outcome"] == "waiting_for_human"
     assert mark_handled_node(state)["outcome"] == "handled"
+
+
+@patch("scoutbot.core._client")
+def test_resumed_run_does_not_call_the_model_again(mock_client):
+    """Stop a run right after triage, then resume it with None: only the last node runs."""
+    mock_client.return_value.messages.create.return_value = _fake_response()
+    graph = build_ticket_graph(checkpointer=InMemorySaver())
+    config = {"configurable": {"thread_id": "T-1"}}
+
+    for values in graph.stream(
+        initial_state("I was charged twice.", "1001"), config, stream_mode="values"
+    ):
+        if values["triage"]:
+            break  # the run stops here, before wait_for_human
+    assert graph.get_state(config).next == ("wait_for_human",)
+
+    final = graph.invoke(None, config)
+
+    assert final["outcome"] == "waiting_for_human"
+    assert mock_client.return_value.messages.create.call_count == 1
 
 
 def test_node_returns_only_the_fields_it_changed():

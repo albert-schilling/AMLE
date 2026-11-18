@@ -8,6 +8,7 @@ dependencies = [
     # New this day, and the only new dependency: LangGraph as the orchestration layer. No
     # langchain-anthropic - every model call still goes through the Anthropic SDK directly.
     "langgraph>=1.2,<2",
+    "langgraph-checkpoint-sqlite>=3.1,<4",
     "pydantic>=2.9,<3",
     "python-dotenv>=1.0,<2",
 ]

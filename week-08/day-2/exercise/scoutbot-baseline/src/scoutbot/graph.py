@@ -113,7 +113,7 @@ def route_after_triage(state: TicketState) -> str:
     return "wait_for_human" if state["triage"]["priority"] == "high" else "mark_handled"
 
 
-def build_ticket_graph():
+def build_ticket_graph(checkpointer=None):
     """Wire the nodes up and compile: look_up_customer to triage_ticket, then a branch on
     priority to wait_for_human or mark_handled, then END.
 
@@ -138,7 +138,7 @@ def build_ticket_graph():
     )
     builder.add_edge("wait_for_human", END)
     builder.add_edge("mark_handled", END)
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
 
 
 def initial_state(
