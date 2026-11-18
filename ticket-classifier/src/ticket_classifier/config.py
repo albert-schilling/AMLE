@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     tickets_path: Path = Path("fixtures/tickets.json")
     customers_path: Path = Path("fixtures/customers.json")
     results_path: Path = Path("output/results.json")
+    graph_path: Path = Path("output/graph.mmd")  # mermaid diagram of the workflow
+    checkpoint_path: Path = Path("output/checkpoints.db")  # saved workflow runs
 
     @model_validator(mode="after")
     def _check_thinking_budget(self) -> Settings:

@@ -1,7 +1,11 @@
 from ticket_classifier.client import get_client
 from ticket_classifier.config import get_settings
-from ticket_classifier.graph import TriageState
-from ticket_classifier.models import Customer, Ticket, TicketClassification
+from ticket_classifier.models import (
+    Customer,
+    Ticket,
+    TicketClassification,
+    TriageState,
+)
 from ticket_classifier.prompts import SYSTEM_PROMPT
 
 
