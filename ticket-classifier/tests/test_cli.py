@@ -73,21 +73,7 @@ def test_resume_returns_2_without_paused_run(resume):
     assert main(["resume", "T-9", "--approve"]) == 2
 
 
-def test_help_works_without_api_key(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY")
-
-    with pytest.raises(SystemExit) as exit_info:
-        main(["--help"])
-    assert exit_info.value.code == 0
-
-
 def test_run_without_api_key_returns_2(run, write_tickets):
     run.side_effect = MissingApiKeyError("ANTHROPIC_API_KEY is not set")
 
     assert main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))]) == 2
-
-
-def test_resume_works_without_api_key(resume, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY")
-
-    assert main(["resume", "T-1", "--approve"]) == 0

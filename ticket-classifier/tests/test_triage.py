@@ -1,14 +1,24 @@
 import pytest
 from helpers import LOW
 
+from ticket_classifier.config import get_settings
 from ticket_classifier.graph import build_workflow
+from ticket_classifier.models import TicketClassification
 from ticket_classifier.nodes import TriageError, node_triage
 from ticket_classifier.nodes.names import TRIAGE
+from ticket_classifier.prompts import SYSTEM_PROMPT
 
 
-def test_returns_the_classification(model, make_ticket):
-    update = node_triage({"ticket": make_ticket(), "customer": None})
+def test_calls_the_model_with_prompt_and_schema(model, make_ticket):
+    update = node_triage(
+        {"ticket": make_ticket(text="My card was charged twice"), "customer": None}
+    )
 
+    kwargs = model.call_args.kwargs
+    assert kwargs["system"] == SYSTEM_PROMPT
+    assert kwargs["output_format"] is TicketClassification
+    assert kwargs["max_tokens"] == get_settings().max_tokens
+    assert "My card was charged twice" in kwargs["messages"][0]["content"]
     assert update == {"classification": LOW}
 
 
@@ -20,7 +30,6 @@ def test_no_parsed_output_raises(model, make_ticket):
 
 
 def test_custom_event_arrives_before_the_node_update(model, mocker, make_ticket):
-
     chunks = list(
         build_workflow().stream(
             {"ticket": make_ticket(id="T-1")}, stream_mode=["updates", "custom"]

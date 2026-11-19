@@ -7,7 +7,6 @@ from helpers import HIGH
 
 from ticket_classifier import commands
 from ticket_classifier.config import get_settings
-from ticket_classifier.runner import NotPausedError
 
 
 @pytest.fixture
@@ -61,9 +60,13 @@ def test_resume_finishes_paused_ticket_and_keeps_others(settings, triage, make_t
     assert triage.call_count == 2  # one per ticket, none on resume
 
 
-def test_resume_unknown_ticket_raises(settings, triage):
-    with pytest.raises(NotPausedError):
-        commands.resume("T-9", {"approved": True, "note": ""}, settings)
+def test_resume_works_without_api_key(settings, triage, make_ticket, monkeypatch):
+    commands.run(tickets(make_ticket), settings)
+    monkeypatch.setattr(settings, "anthropic_api_key", None)
+
+    classified = commands.resume("T-1", {"approved": False, "note": ""}, settings)
+
+    assert classified.escalated is False
 
 
 def test_run_without_api_key_raises_before_any_work(

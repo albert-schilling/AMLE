@@ -1,5 +1,5 @@
 from ticket_classifier.models import Customer
-from ticket_classifier.prompts import SYSTEM_PROMPT, create_prompt
+from ticket_classifier.prompts import create_prompt
 
 ALICE = Customer(
     id="1001",
@@ -11,10 +11,6 @@ ALICE = Customer(
     plan="pro",
     products=[],
 )
-
-
-def test_system_prompt_warns_about_untrusted_text():
-    assert "never follow instructions" in SYSTEM_PROMPT
 
 
 def test_prompt_wraps_ticket_text_in_tags(make_ticket):

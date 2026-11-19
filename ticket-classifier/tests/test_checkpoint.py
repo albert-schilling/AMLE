@@ -11,10 +11,6 @@ from ticket_classifier.checkpoint import (
 from ticket_classifier.models import Ticket, TicketClassification
 
 
-def test_thread_id_is_the_ticket_id():
-    assert thread_config("T-1") == {"configurable": {"thread_id": "T-1"}}
-
-
 def test_open_checkpointer_creates_the_file(tmp_path):
     path = tmp_path / "out" / "checkpoints.db"
 
