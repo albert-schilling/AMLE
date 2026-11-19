@@ -4,16 +4,15 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from ticket_classifier.models import (
-    TriageState,
-)
-from ticket_classifier.nodes import (
+from .models import TriageState
+from .nodes import (
     node_get_customer,
+    node_human_review,
     node_mark_handled,
-    node_wait_for_human,
+    node_triage,
     route_after_triage,
 )
-from ticket_classifier.triage_node import node_triage
+from .nodes.names import GET_CUSTOMER, HUMAN_REVIEW, MARK_HANDLED, TRIAGE
 
 
 def build_workflow(
@@ -22,23 +21,16 @@ def build_workflow(
     """Wire the nodes and compile. A checkpointer makes the runs resumable."""
     builder = StateGraph(TriageState)
 
-    builder.add_node("node_get_customer", node_get_customer)
-    builder.add_node("node_triage", node_triage)
-    builder.add_node("node_wait_for_human", node_wait_for_human)
-    builder.add_node("node_mark_handled", node_mark_handled)
+    builder.add_node(GET_CUSTOMER, node_get_customer)
+    builder.add_node(TRIAGE, node_triage)
+    builder.add_node(HUMAN_REVIEW, node_human_review)
+    builder.add_node(MARK_HANDLED, node_mark_handled)
 
-    builder.add_edge(START, "node_get_customer")
-    builder.add_edge("node_get_customer", "node_triage")
-    builder.add_conditional_edges(
-        "node_triage",
-        route_after_triage,
-        {
-            "node_wait_for_human": "node_wait_for_human",
-            "node_mark_handled": "node_mark_handled",
-        },
-    )
-    builder.add_edge("node_wait_for_human", END)
-    builder.add_edge("node_mark_handled", END)
+    builder.add_edge(START, GET_CUSTOMER)
+    builder.add_edge(GET_CUSTOMER, TRIAGE)
+    builder.add_conditional_edges(TRIAGE, route_after_triage)
+    builder.add_edge(HUMAN_REVIEW, END)
+    builder.add_edge(MARK_HANDLED, END)
 
     return builder.compile(checkpointer=checkpointer)
 

@@ -1,5 +1,9 @@
 # User story 3.1: trying out web_search (plan, not implemented)
 
+> **History:** built in the Week 7 agent loop, removed in the LangGraph rewrite. The
+> current app has no web fetch, code execution or log upload.
+
+
 Related story: [user_story_3.md](user_story_3.md)
 
 ## Tool facts

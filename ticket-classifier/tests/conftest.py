@@ -1,13 +1,11 @@
 import json
-import os
 
 import pytest
+from helpers import LOW
 
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
-
-from ticket_classifier import customers  # noqa: E402
-from ticket_classifier.config import get_settings  # noqa: E402
-from ticket_classifier.models import Ticket  # noqa: E402
+from ticket_classifier import customers
+from ticket_classifier.config import get_settings
+from ticket_classifier.models import Ticket
 
 CUSTOMERS = {
     "1001": {
@@ -25,7 +23,10 @@ CUSTOMERS = {
 
 @pytest.fixture(autouse=True)
 def _isolated_settings(monkeypatch, tmp_path):
-    """Keep tests independent of the developer's real .env and API key."""
+    """Keep tests independent of the developer's real .env and API key.
+
+    Relative default paths (``output/...``) land in ``tmp_path`` too.
+    """
     monkeypatch.chdir(tmp_path)  # so no .env is picked up
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()
@@ -66,3 +67,26 @@ def write_tickets(tmp_path):
         return path
 
     return _write
+
+
+@pytest.fixture
+def model(mocker, customers_file):
+    """Mock the triage call; returns the mocked ``parse`` to count calls.
+
+    The ticket text picks the outcome via ``model.outcomes[text]``, default ``LOW``.
+    An outcome is a classification, None (no parsed output) or an exception.
+    """
+    outcomes = {}
+    client = mocker.patch("ticket_classifier.nodes.triage.get_client").return_value
+
+    def parse(**kwargs):
+        text = kwargs["messages"][0]["content"].split("<ticket>\n")[1].split("\n")[0]
+        outcome = outcomes.get(text, LOW)
+        if isinstance(outcome, Exception):
+            raise outcome
+        stop_reason = "max_tokens" if outcome is None else "end_turn"
+        return mocker.Mock(parsed_output=outcome, stop_reason=stop_reason)
+
+    client.messages.parse.side_effect = parse
+    client.messages.parse.outcomes = outcomes
+    return client.messages.parse

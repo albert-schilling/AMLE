@@ -9,12 +9,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    anthropic_api_key: SecretStr
+    anthropic_api_key: SecretStr | None = None  # needed only for model calls
     model: str = "claude-haiku-4-5"
     max_tokens: int = 4_000
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
-    log_file: Path | None = None  # also write logs and trace here, if set
-    trace_file: Path = Path("output/trace.jsonl")  # one JSON line per node update
+    log_file: Path | None = None  # also write the logs to this file, if set
+    trace_file: Path = Path("output/trace.jsonl")  # one JSON line per workflow event
     tickets_path: Path = Path("fixtures/tickets.json")
     customers_path: Path = Path("fixtures/customers.json")
     results_path: Path = Path("output/results.json")
@@ -25,4 +25,4 @@ class Settings(BaseSettings):
 @cache
 def get_settings() -> Settings:
     """Load settings once; the environment and .env are read on first use."""
-    return Settings()  # type: ignore[call-arg]  # required fields come from the environment
+    return Settings()

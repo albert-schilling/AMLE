@@ -9,5 +9,8 @@ from .config import get_settings
 
 @cache
 def get_client() -> Anthropic:
-    settings = get_settings()
-    return Anthropic(api_key=settings.anthropic_api_key.get_secret_value())
+    """Raises ``RuntimeError`` if ``ANTHROPIC_API_KEY`` is not set."""
+    key = get_settings().anthropic_api_key
+    if key is None:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set")
+    return Anthropic(api_key=key.get_secret_value())

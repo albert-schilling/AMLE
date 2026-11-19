@@ -1,5 +1,9 @@
 # User story 3: web fetch cannot read status.stripe.com
 
+> **History:** built in the Week 7 agent loop, removed in the LangGraph rewrite. The
+> current app has no web fetch, code execution or log upload.
+
+
 **Status: resolved.** The coach said to switch the payment provider to Mollie, set
 `allowed_domains` to `status.mollie.com` and put
 `https://status.mollie.com/api/v2/components.json` in the ticket. That page is plain JSON,

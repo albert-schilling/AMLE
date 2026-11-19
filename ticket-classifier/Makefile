@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 # .PHONY tells Make that these targets are commands, not actual files on disk
-.PHONY: format lint setup test run approve decline help
+.PHONY: format lint setup test run approve decline reset help
 
 # The default target that runs if you just type 'make'
 help:
@@ -14,6 +14,7 @@ help:
 	@echo "  make run     - Run the classifier script"
 	@echo "  make approve TICKET=T-1 NOTE=\"...\" - A human takes over a paused ticket"
 	@echo "  make decline TICKET=T-1 NOTE=\"...\" - No human takes over a paused ticket"
+	@echo "  make reset   - Delete saved runs, trace and results (paused tickets are lost)"
 
 setup:
 	uv sync
@@ -31,10 +32,15 @@ run:
 	@echo "REQUIREMENT: Anthropic API Key in the environment"
 	@echo "WARNING: Executing this script will make calls to the Anthropic API causing potential charges."
 	@echo "Running classifier script..."
-	uv run ticket-classifier
+	uv run ticket-classifier run
 
 
 # Answer a paused ticket; no model call. Usage: make approve TICKET=T-1 NOTE="..."
 approve decline:
 	@test -n "$(TICKET)" || { echo "Usage: make $@ TICKET=<id> [NOTE=\"...\"]"; exit 2; }
-	uv run ticket-classifier --resume "$(TICKET)" --$@ --note "$(NOTE)"
+	uv run ticket-classifier resume "$(TICKET)" --$@ --note "$(NOTE)"
+
+# Start from scratch: the next run classifies every ticket again.
+reset:
+	@echo "WARNING: deletes saved runs; paused tickets cannot be resumed afterwards."
+	rm -f output/checkpoints.db output/trace.jsonl output/results.json

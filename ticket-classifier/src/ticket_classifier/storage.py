@@ -1,3 +1,5 @@
+"""Files: read tickets, write and merge results."""
+
 from pathlib import Path
 
 from pydantic import TypeAdapter
@@ -9,7 +11,15 @@ RESULTS_ADAPTER = TypeAdapter(list[ClassifiedTicket])
 
 
 def load_tickets(path: Path) -> list[Ticket]:
+    """Raises ``OSError`` if unreadable, ``ValidationError`` if not valid tickets."""
     return TICKETS_ADAPTER.validate_json(path.read_text(encoding="utf-8"))
+
+
+def load_results(path: Path) -> list[ClassifiedTicket]:
+    """The saved results; empty if there is no file yet."""
+    if not path.exists():
+        return []
+    return RESULTS_ADAPTER.validate_json(path.read_text(encoding="utf-8"))
 
 
 def save_results(results: list[ClassifiedTicket], path: Path) -> None:
@@ -19,9 +29,6 @@ def save_results(results: list[ClassifiedTicket], path: Path) -> None:
 
 def merge_results(results: list[ClassifiedTicket], path: Path) -> None:
     """Add results to the saved ones; a new result replaces one with the same id."""
-    saved = []
-    if path.exists():
-        saved = RESULTS_ADAPTER.validate_json(path.read_text(encoding="utf-8"))
     new_ids = {result.ticket_id for result in results}
-    kept = [result for result in saved if result.ticket_id not in new_ids]
+    kept = [result for result in load_results(path) if result.ticket_id not in new_ids]
     save_results(kept + results, path)

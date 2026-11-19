@@ -1,5 +1,9 @@
 # USER STORY 3: Web Fetch of a live status page
 
+> **History:** built in the Week 7 agent loop, removed in the LangGraph rewrite. The
+> current app has no web fetch, code execution or log upload.
+
+
 As the billing team, we want to have Scoutbot make sure that the payment provider (Mollie) is running before assuming a duplicate charge is Anchorpoint's fault.
 
 > Changed after coach feedback: Stripe's status page is rendered by JavaScript, so web fetch

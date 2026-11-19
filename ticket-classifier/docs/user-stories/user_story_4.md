@@ -1,5 +1,9 @@
 # USER STORY 4: Parse a messy log file
 
+> **History:** built in the Week 7 agent loop, removed in the LangGraph rewrite. The
+> current app has no web fetch, code execution or log upload.
+
+
 Ticket T-2002 needs information from a log file to be resolved. Use code execution tool to extract a number out of a log file `sample_app.log`. The ticket explains what to look for.
 
 ## Steps
