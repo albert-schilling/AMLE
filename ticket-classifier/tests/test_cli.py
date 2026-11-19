@@ -1,8 +1,11 @@
 import json
 
+import pytest
+
 from ticket_classifier.batch import BatchResult
 from ticket_classifier.cli import main
 from ticket_classifier.models import ResolvedTicket
+from ticket_classifier.storage import save_results
 
 
 def classified(ticket_id):
@@ -102,3 +105,50 @@ def test_main_uploads_log_and_passes_file_id(
 
     upload.assert_called_once()
     assert classify_all.call_args.args[2] == "file_1"
+
+
+def test_main_resume_runs_only_that_ticket_with_the_answer(
+    mocker, write_tickets, results_file
+):
+    tickets = write_tickets([{"id": "T-1", "text": "a"}, {"id": "T-2", "text": "b"}])
+    classify_all = patch_pipeline(mocker, BatchResult(classified=[classified("T-2")]))
+
+    assert main([str(tickets), "--resume", "T-2", "--approve", "--note", "ok"]) == 0
+
+    assert [t.id for t in classify_all.call_args.args[0]] == ["T-2"]
+    assert classify_all.call_args.kwargs["answers"] == {
+        "T-2": {"approved": True, "note": "ok"}
+    }
+
+
+def test_main_resume_keeps_other_saved_results(mocker, write_tickets, results_file):
+    save_results([classified("T-1")], results_file)
+    tickets = write_tickets([{"id": "T-2", "text": "b"}])
+    patch_pipeline(mocker, BatchResult(classified=[classified("T-2")]))
+
+    main([str(tickets), "--resume", "T-2", "--decline"])
+
+    saved = [r["ticket_id"] for r in json.loads(results_file.read_text())]
+    assert saved == ["T-1", "T-2"]
+
+
+def test_main_resume_unknown_ticket_returns_2(mocker, write_tickets, results_file):
+    tickets = write_tickets([{"id": "T-1", "text": "a"}])
+    classify_all = patch_pipeline(mocker, BatchResult())
+
+    assert main([str(tickets), "--resume", "T-9", "--approve"]) == 2
+    classify_all.assert_not_called()
+
+
+def test_main_resume_needs_a_decision(write_tickets):
+    tickets = write_tickets([{"id": "T-1", "text": "a"}])
+
+    with pytest.raises(SystemExit):
+        main([str(tickets), "--resume", "T-1"])
+
+
+def test_main_decision_needs_resume(write_tickets):
+    tickets = write_tickets([{"id": "T-1", "text": "a"}])
+
+    with pytest.raises(SystemExit):
+        main([str(tickets), "--approve"])

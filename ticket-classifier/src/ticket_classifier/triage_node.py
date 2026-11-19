@@ -1,3 +1,7 @@
+from typing import Any
+
+from langgraph.types import StreamWriter
+
 from ticket_classifier.client import get_client
 from ticket_classifier.config import get_settings
 from ticket_classifier.models import (
@@ -7,6 +11,10 @@ from ticket_classifier.models import (
     TriageState,
 )
 from ticket_classifier.prompts import SYSTEM_PROMPT
+
+
+def ignore_event(event: Any) -> None:
+    """Default stream writer: drop the event when the node runs outside a graph."""
 
 
 def create_prompt(customer: Customer | None, ticket: Ticket) -> str:
@@ -20,7 +28,7 @@ def create_prompt(customer: Customer | None, ticket: Ticket) -> str:
     return "\n".join(parts)
 
 
-def node_triage(state: TriageState) -> TriageState:
+def node_triage(state: TriageState, writer: StreamWriter = ignore_event) -> TriageState:
     settings = get_settings()
 
     client = get_client()
@@ -28,6 +36,8 @@ def node_triage(state: TriageState) -> TriageState:
     ticket = state["ticket"]
 
     prompt = create_prompt(customer, ticket)
+
+    writer({"event": "calling model", "ticket_id": ticket.id, "model": settings.model})
 
     output = client.messages.parse(
         model=settings.model,

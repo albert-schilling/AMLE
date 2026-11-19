@@ -15,3 +15,13 @@ def load_tickets(path: Path) -> list[Ticket]:
 def save_results(results: list[ClassifiedTicket], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(RESULTS_ADAPTER.dump_json(results, indent=2))
+
+
+def merge_results(results: list[ClassifiedTicket], path: Path) -> None:
+    """Add results to the saved ones; a new result replaces one with the same id."""
+    saved = []
+    if path.exists():
+        saved = RESULTS_ADAPTER.validate_json(path.read_text(encoding="utf-8"))
+    new_ids = {result.ticket_id for result in results}
+    kept = [result for result in saved if result.ticket_id not in new_ids]
+    save_results(kept + results, path)

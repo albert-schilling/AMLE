@@ -44,6 +44,27 @@ Calls the Anthropic API and may incur charges. The run is interactive: if the mo
 calls `escalate_to_human`, you get a `[y/N]` prompt (without a terminal it counts as
 rejected).
 
+### Human review of high-priority tickets
+
+The workflow runs as a LangGraph graph: look up customer, triage, then route. A
+high-priority ticket pauses in `node_wait_for_human` (`interrupt()`) and waits for a
+person. The run is saved in `CHECKPOINT_PATH` (SQLite, default `output/checkpoints.db`),
+so the process can exit. The run log shows what the reviewer needs (ticket, customer,
+classification) and the command to answer:
+
+```sh
+uv run ticket-classifier --resume T-3 --approve --note "Dana takes it"
+uv run ticket-classifier --resume T-3 --decline --note "Bot can answer"
+```
+
+A resume finishes only that ticket, makes no model call and adds its result to
+`results.json` without removing the others. `--approve` gives `escalated: true` with
+the note as reason, `--decline` gives `escalated: false`. Paused tickets are not in
+`results.json` until they are answered; a normal run leaves them paused.
+
+While a run works, nodes emit progress events (e.g. `calling model`), logged as
+`[custom]` lines. `LOG_LEVEL=DEBUG` also logs every state update.
+
 Exit code: `0` every ticket got an outcome (a classification, or an escalation, which
 has no category/priority), `1` some tickets failed (the rest are still saved), `2`
 input could not be loaded.
@@ -65,21 +86,23 @@ Customers are read from `CUSTOMERS_PATH` (JSON object keyed by customer id).
 
 Environment variables or `.env`, see [.env.example](.env.example):
 `ANTHROPIC_API_KEY` (required), `MODEL`, `MAX_TOKENS`, `MAX_ITERATIONS`, `THINKING_BUDGET`, `LOG_LEVEL`,
-`LOG_FILE`, `TRACE_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`.
+`LOG_FILE`, `TRACE_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`,
+`CHECKPOINT_PATH`, `GRAPH_PATH`.
 
 ## Layout
 
 | Module | Role |
 | --- | --- |
 | `cli.py` | argument parsing, exit codes |
-| `batch.py` | classify many tickets, collect failures |
+| `batch.py` | run each ticket through the graph, resume paused or crashed runs, collect failures |
+| `graph.py`, `nodes.py`, `triage_node.py` | LangGraph workflow: customer lookup, triage, pause for a human |
 | `classifier.py` | one ticket → capped agent loop (Claude tool runner) → result row (`ResolvedTicket` or `EscalatedTicket`) |
 | `prompts.py` | system and user prompts |
 | `client.py` | Anthropic client, log file upload |
 | `approval.py`, `trace.py`, `logging_config.py` | human approval prompt, trace logging, logger setup |
 | `tools.py` | tools the model can call |
 | `customers.py` | customer data access (swap for a DB later) |
-| `storage.py` | read tickets, write results |
+| `storage.py` | read tickets, write or merge results |
 | `models.py`, `config.py` | pydantic models and settings |
 
 ## Development
