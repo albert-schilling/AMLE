@@ -13,7 +13,6 @@ def classified(ticket_id):
 
 
 def patch_pipeline(mocker, batch):
-    mocker.patch("ticket_classifier.cli.get_client")
     return mocker.patch("ticket_classifier.cli.classify_all", return_value=batch)
 
 
@@ -89,22 +88,6 @@ def test_main_returns_2_on_missing_tickets_file(mocker, tmp_path, results_file):
     patch_pipeline(mocker, BatchResult())
 
     assert main([str(tmp_path / "missing.json")]) == 2
-
-
-def test_main_uploads_log_and_passes_file_id(
-    mocker, write_tickets, results_file, tmp_path, monkeypatch
-):
-    log = tmp_path / "app.log"
-    log.write_text("x")
-    monkeypatch.setenv("LOG_PATH", str(log))
-    tickets = write_tickets([{"id": "T-1", "customer_id": "1001", "text": "x"}])
-    classify_all = patch_pipeline(mocker, BatchResult())
-    upload = mocker.patch("ticket_classifier.cli.upload_log", return_value="file_1")
-
-    main([str(tickets)])
-
-    upload.assert_called_once()
-    assert classify_all.call_args.args[2] == "file_1"
 
 
 def test_main_resume_runs_only_that_ticket_with_the_answer(

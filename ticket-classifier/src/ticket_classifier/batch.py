@@ -1,12 +1,10 @@
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from anthropic import APIError
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
-from .classifier import ClassificationError
 from .graph import TriageState
 from .models import (
     ClassifiedTicket,
@@ -103,8 +101,6 @@ def to_classified_ticket(ticket: Ticket, result: TriageState) -> ClassifiedTicke
 
 def classify_all(
     tickets: list[Ticket],
-    approve: Callable[[str], bool],
-    log_file_id: str | None = None,
     *,
     workflow: CompiledStateGraph,
     answers: dict[str, dict] | None = None,
@@ -122,7 +118,7 @@ def classify_all(
                 batch.paused.append(ticket.id)
                 continue
             classified_ticket = to_classified_ticket(ticket, result)
-        except (ClassificationError, APIError) as error:
+        except APIError as error:
             batch.failed.append(ticket.id)
             logger.error("Ticket %s failed: %s", ticket.id, error)
             continue

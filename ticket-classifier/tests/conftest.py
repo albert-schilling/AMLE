@@ -1,10 +1,8 @@
 import json
 import os
-from types import SimpleNamespace
 
 import pytest
 
-# Before any ticket_classifier import: tools.py reads the settings at import time.
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 
 from ticket_classifier import customers  # noqa: E402
@@ -35,97 +33,6 @@ def _isolated_settings(monkeypatch, tmp_path):
     yield
     get_settings.cache_clear()
     customers.load_customers.cache_clear()
-
-
-@pytest.fixture
-def mock_client(mocker):
-    return mocker.Mock()
-
-
-class FakeRunner:
-    """Stands in for the SDK tool runner: yields messages, then ends."""
-
-    def __init__(self, messages, observations=None):
-        self.messages = messages
-        self.observations = observations or [None] * len(messages)
-        self._index = -1
-
-    def __iter__(self):
-        for index, message in enumerate(self.messages):
-            self._index = index
-            yield message
-
-    def generate_tool_call_response(self):
-        return self.observations[self._index]
-
-    def until_done(self):
-        return self.messages[-1]
-
-
-def thinking(content):
-    return SimpleNamespace(type="thinking", thinking=content)
-
-
-def text(content):
-    return SimpleNamespace(type="text", text=content)
-
-
-def tool_use(name, **tool_input):
-    return SimpleNamespace(type="tool_use", name=name, input=tool_input)
-
-
-def server_tool_use(name, **tool_input):
-    return SimpleNamespace(type="server_tool_use", name=name, input=tool_input)
-
-
-def web_fetch_result(url=None, error_code=None):
-    if error_code:
-        content = SimpleNamespace(
-            type="web_fetch_tool_result_error", error_code=error_code
-        )
-    else:
-        content = SimpleNamespace(type="web_fetch_result", url=url)
-    return SimpleNamespace(type="web_fetch_tool_result", content=content)
-
-
-def code_result(stdout="", return_code=0, error_code=None):
-    if error_code:
-        content = SimpleNamespace(
-            type="bash_code_execution_tool_result_error", error_code=error_code
-        )
-    else:
-        content = SimpleNamespace(
-            type="bash_code_execution_result",
-            stdout=stdout,
-            stderr="",
-            return_code=return_code,
-        )
-    return SimpleNamespace(type="bash_code_execution_tool_result", content=content)
-
-
-def message(*blocks, stop_reason="end_turn", parsed_output=None, usage=(0, 0)):
-    return SimpleNamespace(
-        content=list(blocks),
-        stop_reason=stop_reason,
-        parsed_output=parsed_output,
-        usage=SimpleNamespace(input_tokens=usage[0], output_tokens=usage[1]),
-    )
-
-
-def observation(content):
-    return {"content": [{"type": "tool_result", "content": content}]}
-
-
-@pytest.fixture
-def runner_returns(mock_client):
-    """Make the fake client return a FakeRunner over the given messages."""
-
-    def _set(messages, observations=None):
-        runner = FakeRunner(messages, observations)
-        mock_client.beta.messages.tool_runner.return_value = runner
-        return runner
-
-    return _set
 
 
 @pytest.fixture

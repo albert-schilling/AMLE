@@ -4,14 +4,11 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-from anthropic import APIError
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite import SqliteSaver
 from pydantic import ValidationError
 
-from .approval import console_approval
 from .batch import classify_all
-from .client import get_client, upload_log
 from .config import get_settings
 from .graph import build_workflow, write_mermaid
 from .logging_config import configure_logging
@@ -79,29 +76,13 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         answers[args.resume] = {"approved": args.approve, "note": args.note}
 
-    log_file_id = None
-    if not args.resume and settings.log_path.exists():  # a resume needs no model call
-        client = get_client()
-        try:
-            log_file_id = upload_log(client, settings.log_path)
-        except APIError as error:
-            logger.error(
-                "Cannot upload %s, continuing without it: %s", settings.log_path, error
-            )
-
     settings.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     with closing(
         sqlite3.connect(settings.checkpoint_path, check_same_thread=False)
     ) as connection:
         workflow = build_workflow(SqliteSaver(connection, serde=CHECKPOINT_SERDE))
         write_mermaid(workflow, settings.graph_path)
-        batch = classify_all(
-            tickets,
-            console_approval,
-            log_file_id,
-            workflow=workflow,
-            answers=answers,
-        )
+        batch = classify_all(tickets, workflow=workflow, answers=answers)
     if args.resume:
         merge_results(batch.classified, settings.results_path)
     else:

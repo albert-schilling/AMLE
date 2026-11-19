@@ -12,10 +12,6 @@ from ticket_classifier.models import (
 CONFIG = {"configurable": {"thread_id": "T-1"}}
 
 
-def never(reason):
-    return False
-
-
 @pytest.fixture
 def parse(mocker):
     """Mock the triage model call; returns the mock to count calls."""
@@ -32,7 +28,7 @@ def parse(mocker):
 def test_high_priority_ticket_pauses_for_a_human(parse, make_ticket):
     workflow = build_workflow(InMemorySaver())
 
-    batch = classify_all([make_ticket(id="T-1")], never, workflow=workflow)
+    batch = classify_all([make_ticket(id="T-1")], workflow=workflow)
 
     assert batch.paused == ["T-1"]
     assert batch.classified == []
@@ -46,9 +42,9 @@ def test_high_priority_ticket_pauses_for_a_human(parse, make_ticket):
 def test_paused_run_without_answer_stays_paused(parse, make_ticket):
     workflow = build_workflow(InMemorySaver())
     ticket = make_ticket(id="T-1")
-    classify_all([ticket], never, workflow=workflow)
+    classify_all([ticket], workflow=workflow)
 
-    batch = classify_all([ticket], never, workflow=workflow)
+    batch = classify_all([ticket], workflow=workflow)
 
     assert batch.paused == ["T-1"]
     assert parse.call_count == 1
@@ -57,10 +53,10 @@ def test_paused_run_without_answer_stays_paused(parse, make_ticket):
 def test_approved_answer_finishes_the_run_escalated(parse, make_ticket):
     workflow = build_workflow(InMemorySaver())
     ticket = make_ticket(id="T-1")
-    classify_all([ticket], never, workflow=workflow)
+    classify_all([ticket], workflow=workflow)
 
     answer = {"approved": True, "note": "Dana takes it"}
-    batch = classify_all([ticket], never, workflow=workflow, answers={"T-1": answer})
+    batch = classify_all([ticket], workflow=workflow, answers={"T-1": answer})
 
     assert batch.classified == [
         EscalatedTicket(
@@ -77,10 +73,10 @@ def test_approved_answer_finishes_the_run_escalated(parse, make_ticket):
 def test_declined_answer_finishes_the_run_resolved(parse, make_ticket):
     workflow = build_workflow(InMemorySaver())
     ticket = make_ticket(id="T-1")
-    classify_all([ticket], never, workflow=workflow)
+    classify_all([ticket], workflow=workflow)
 
     answer = {"approved": False, "note": "Bot can answer this"}
-    batch = classify_all([ticket], never, workflow=workflow, answers={"T-1": answer})
+    batch = classify_all([ticket], workflow=workflow, answers={"T-1": answer})
 
     assert batch.classified == [
         ResolvedTicket(ticket_id="T-1", category="billing", priority="high")
@@ -98,7 +94,7 @@ def test_crashed_run_continues_without_calling_the_model_again(parse, make_ticke
     assert workflow.get_state(CONFIG).next == ("node_wait_for_human",)
     assert workflow.get_state(CONFIG).interrupts == ()
 
-    batch = classify_all([ticket], never, workflow=workflow)
+    batch = classify_all([ticket], workflow=workflow)
 
     assert batch.paused == ["T-1"]
     assert parse.call_count == 1
