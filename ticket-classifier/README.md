@@ -55,6 +55,8 @@ classification) and the command to answer:
 ```sh
 uv run ticket-classifier --resume T-3 --approve --note "Dana takes it"
 uv run ticket-classifier --resume T-3 --decline --note "Bot can answer"
+make approve TICKET=T-3 NOTE="Dana takes it"   # same, via make
+make decline TICKET=T-3 NOTE="Bot can answer"
 ```
 
 A resume finishes only that ticket, makes no model call and adds its result to

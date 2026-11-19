@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 # .PHONY tells Make that these targets are commands, not actual files on disk
-.PHONY: format lint setup test run help
+.PHONY: format lint setup test run approve decline help
 
 # The default target that runs if you just type 'make'
 help:
@@ -12,6 +12,8 @@ help:
 	@echo "  make format  - Format the code using ruff"
 	@echo "  make lint    - Lint the code using ruff"
 	@echo "  make run     - Run the classifier script"
+	@echo "  make approve TICKET=T-1 NOTE=\"...\" - A human takes over a paused ticket"
+	@echo "  make decline TICKET=T-1 NOTE=\"...\" - No human takes over a paused ticket"
 
 setup:
 	uv sync
@@ -31,3 +33,8 @@ run:
 	@echo "Running classifier script..."
 	uv run ticket-classifier
 
+
+# Answer a paused ticket; no model call. Usage: make approve TICKET=T-1 NOTE="..."
+approve decline:
+	@test -n "$(TICKET)" || { echo "Usage: make $@ TICKET=<id> [NOTE=\"...\"]"; exit 2; }
+	uv run ticket-classifier --resume "$(TICKET)" --$@ --note "$(NOTE)"
