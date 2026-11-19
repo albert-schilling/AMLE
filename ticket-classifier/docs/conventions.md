@@ -1,5 +1,39 @@
 # Code conventions
 
+## General
+
+Write clean code for humans: code a reader understands on the first pass.
+
+- **One job each.** Small modules and functions with a single responsibility. If a
+  name needs "and", split it.
+- **Few arguments.** App-wide singletons come from cached accessors
+  (`get_settings()`, `get_client()`), not from argument chains; tests swap them via
+  env vars and `cache_clear()` or a patch. Pass in only what the caller must choose,
+  e.g. which checkpointer (SQLite or in-memory).
+- **Fail loudly.** Catch only errors you can handle, never a bare `except Exception`.
+  Return a clear error instead of a silent default.
+- **No dead code.** No commented-out code, no unused helpers, no abstractions "just
+  in case". Delete what is no longer used; git keeps the history.
+- **Names say what something does.** Prefer a clear long name to a short vague one,
+  and the same word for the same thing everywhere.
+
+## Structure
+
+- `models/` holds data only (pydantic models, TypedDicts, `Literal` types), no logic.
+  Input in `domain.py`, graph state in `state.py`, output rows in `results.py`.
+- One file per node in `nodes/`. Use node names only from `nodes/names.py`, never as
+  string literals.
+- Every run goes through `runner.run_thread`; a thread's status comes only from
+  `checkpoint.run_status`.
+- The checkpointer is passed to `build_workflow`, never created inside it.
+- `cli.py` maps commands to exit codes; the work happens in `commands.py`.
+
+## Types
+
+- A `TypedDict` has no defaults: mark keys that may be missing with `NotRequired`.
+- Use a `dataclass` for internal objects, pydantic for data from outside (files, model
+  output), a `TypedDict` where LangGraph needs a plain dict.
+
 ## Leading underscore
 
 A leading underscore means one thing: **private attribute of a class** (pydantic
@@ -10,3 +44,16 @@ treats `_name` in a model as a private attribute).
 - Module API is defined by `__all__` where it matters, not by underscores.
 - Exception: pytest fixtures that are `autouse` and never requested by name
   (`_isolated_settings`).
+
+## Tests
+
+- Test behaviour: run the real graph (`InMemorySaver` or a SQLite file in `tmp_path`)
+  and mock only the model, with the `model` fixture from `conftest.py`.
+- Test behaviour, not the code's shape: a test must be able to fail when our code is
+  wrong. No tests of constants, declarations, defaults or pydantic itself.
+- Never import from `conftest.py`; shared test data goes in `tests/helpers.py`.
+
+## Writing
+
+- Code, comments, docs and commit messages in plain, short English.
+- Comments say why, not what.
