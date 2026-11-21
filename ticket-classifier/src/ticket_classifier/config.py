@@ -21,6 +21,18 @@ class Settings(BaseSettings):
     graph_path: Path = Path("output/graph.mmd")  # mermaid diagram of the workflow
     checkpoint_path: Path = Path("output/checkpoints.db")  # saved workflow runs
 
+    # OpenTelemetry (traces, metrics, logs). The names are the standard OTEL_* env
+    # vars; the SDK reads only os.environ, so these values are handed to it at start.
+    otel_enabled: bool = False  # off: no instrumentation, nothing is sent
+    otel_service_name: str = "ticket-classifier"
+    # OTLP HTTP endpoint of the collector; "" prints telemetry to the console.
+    otel_exporter_otlp_endpoint: str = "http://localhost:4318"
+    # Extra resource attributes, "key=value,key=value". service.version comes from
+    # the package version.
+    otel_resource_attributes: str = (
+        "service.namespace=amle,deployment.environment.name=local"
+    )
+
 
 @cache
 def get_settings() -> Settings:

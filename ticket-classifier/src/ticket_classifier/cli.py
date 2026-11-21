@@ -8,6 +8,7 @@ from .config import Settings, get_settings
 from .logging_config import configure_logging
 from .runner import NotPausedError
 from .storage import load_tickets
+from .telemetry import configure_telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = get_settings()
     configure_logging(settings)
+    configure_telemetry(settings)  # before the first Anthropic client is created
 
     match args:
         case RunArgs():

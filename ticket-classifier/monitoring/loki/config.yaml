@@ -1,0 +1,53 @@
+# Loki 3 single binary: stores the logs the OTel Collector sends over OTLP (/otlp).
+# Based on the official local config:
+# https://github.com/grafana/loki/blob/main/cmd/loki/loki-local-config.yaml
+# Retention: https://grafana.com/docs/loki/latest/operations/storage/retention/
+# OTLP: https://grafana.com/docs/loki/latest/send-data/otel/
+
+auth_enabled: false # one tenant, no X-Scope-OrgID header needed
+
+server:
+  http_listen_port: 3100 # push API (/otlp), query API for Grafana, /ready
+
+# Shared defaults for all Loki components running in this one process.
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki # on the loki-data volume
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks # compressed log lines
+      rules_directory: /loki/rules
+  replication_factor: 1 # one instance, no copies
+  ring:
+    kvstore:
+      store: inmemory
+
+# How the index is stored. tsdb + v13 is required for structured metadata (OTLP).
+# A 24h period is required for retention.
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+# Retention is off by default (logs kept forever). The compactor deletes old data.
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h # time to cancel a deletion before it happens
+  delete_request_store: filesystem
+
+limits_config:
+  retention_period: 336h # 14 days
+  # OTLP log attributes (e.g. ticket_id) are stored as structured metadata: filterable,
+  # but not index labels. Resource attributes like service.name become labels.
+  allow_structured_metadata: true # default in Loki 3, set explicitly
+
+# No usage statistics sent to Grafana Labs: local only.
+analytics:
+  reporting_enabled: false

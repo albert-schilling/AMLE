@@ -1,0 +1,27 @@
+# Prometheus: stores the metrics the OTel Collector pushes over OTLP.
+# Docs: https://prometheus.io/docs/guides/opentelemetry/
+# The OTLP receiver itself is turned on by --web.enable-otlp-receiver (docker-compose.yml).
+
+global:
+  scrape_interval: 15s
+
+storage:
+  tsdb:
+    # OTLP pushes can arrive late or out of order (batching, retries); accept them.
+    out_of_order_time_window: 30m
+
+otlp:
+  # Resource attributes are stored once in `target_info`. Promote the ones we filter
+  # by to labels on every series, so queries don't need a join.
+  promote_resource_attributes:
+    - service.name
+    - service.namespace
+    - service.version
+    - service.instance.id
+    - deployment.environment.name
+
+scrape_configs:
+  # Prometheus' own metrics, to check that it runs.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

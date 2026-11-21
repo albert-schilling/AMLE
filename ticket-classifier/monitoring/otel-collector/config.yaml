@@ -1,0 +1,60 @@
+# OTel Collector: receives OTLP from the app, sends metrics to Prometheus,
+# traces to Tempo and logs to Loki.
+# Docs: https://opentelemetry.io/docs/collector/configuration/
+
+receivers:
+  otlp:
+    protocols:
+      # The collector listens on localhost by default; 0.0.0.0 lets the Docker port
+      # mapping reach it. The host side is bound to 127.0.0.1 in docker-compose.yml.
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # First in every pipeline: refuses data before the collector runs out of memory.
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  # Last before the exporters: sends data in batches.
+  batch: {}
+
+exporters:
+  # Prometheus takes OTLP over HTTP only. `endpoint` is a base URL: the exporter
+  # sends to <endpoint>/v1/metrics, i.e. /api/v1/otlp/v1/metrics.
+  otlp_http/prometheus:
+    endpoint: http://prometheus:9090/api/v1/otlp
+  # Tempo takes OTLP gRPC; plaintext inside the Docker network.
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  # Loki 3 takes OTLP natively. `endpoint` is a base URL: the exporter sends to
+  # <endpoint>/v1/logs, i.e. /otlp/v1/logs.
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+  # Prints a short summary of what passes through: `docker compose logs otel-collector`.
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/prometheus, debug]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_grpc/tempo, debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/loki, debug]

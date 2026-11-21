@@ -1,0 +1,89 @@
+# Grafana data sources, created at startup. Each has a fixed uid so the links below
+# can point at each other.
+# Docs: https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources
+# Grafana expands $VAR in this file, so a literal $ is written as $$.
+
+apiVersion: 1
+
+# Remove data sources that are no longer in this file.
+prune: true
+
+datasources:
+  # Metrics: app metrics from the collector and span metrics from Tempo.
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy # Grafana's backend queries, not the browser
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      prometheusType: Prometheus
+      prometheusVersion: 3.15.1
+      timeInterval: 15s # matches scrape_interval
+      # Metrics -> traces: exemplars carry a trace id (label "traceID", set by Tempo).
+      exemplarTraceIdDestinations:
+        - name: traceID
+          datasourceUid: tempo
+
+  # Traces.
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      streamingEnabled: # needs stream_over_http_enabled in Tempo
+        search: true
+        metrics: true
+      # Traces -> logs: "Logs for this span" opens Loki, filtered by trace id.
+      # OTLP logs keep trace_id as structured metadata, so a label filter is used
+      # (a |= line filter would not find it).
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: "-2s"
+        spanEndTimeShift: "2s"
+        tags:
+          - key: service.name
+            value: service_name
+        customQuery: true
+        query: '{$${__tags}} | trace_id="$${__trace.traceId}"'
+      # Traces -> metrics: span metrics from Tempo's metrics generator.
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        tags:
+          - key: service.name
+            value: service
+        queries:
+          - name: Request rate
+            query: "sum(rate(traces_spanmetrics_calls_total{$${__tags}}[5m]))"
+          - name: Latency p95
+            query: "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{$${__tags}}[5m])))"
+      # Service graph from Tempo's service-graphs metrics in Prometheus.
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+
+  # Logs.
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 1000
+      # Logs -> traces: a "View trace" link on every line with a trace_id.
+      # matcherType "label" matches labels and structured metadata (OTLP trace_id).
+      derivedFields:
+        - name: TraceID
+          matcherType: label
+          matcherRegex: "^trace_id$"
+          datasourceUid: tempo
+          url: "$${__value.raw}"
+          urlDisplayLabel: View trace

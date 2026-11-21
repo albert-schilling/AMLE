@@ -1,0 +1,98 @@
+# Local observability stack: OTel Collector -> Prometheus, Tempo, Loki -> Grafana.
+# Two networks:
+#   backend  (internal): Prometheus, Tempo, Loki. No internet access, no host ports;
+#                        reach them through Grafana (Explore) or `make obs-check`.
+#   frontend (normal):   only the collector and Grafana, which need host ports.
+# Host ports listen on 127.0.0.1 only. Data lives in named volumes and survives
+# restarts; `docker compose down -v` deletes it.
+# Config files are added step by step (see docs/exercises/plan_w8d5.md).
+
+name: ticket-classifier-monitoring
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.164.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:4317:4317" # OTLP gRPC
+      - "127.0.0.1:4318:4318" # OTLP HTTP (TraceVerde default)
+      - "127.0.0.1:13133:13133" # health check: curl localhost:13133
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    restart: unless-stopped
+    networks: [frontend, backend]
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=14d" # delete data older than 14 days ...
+      - "--storage.tsdb.retention.size=1GB" # ... or the oldest data above 1 GB
+      - "--web.enable-otlp-receiver" # accept OTLP pushes at /api/v1/otlp/v1/metrics
+      - "--web.enable-remote-write-receiver" # Tempo pushes span metrics at /api/v1/write
+      - "--enable-feature=exemplar-storage" # keep trace ids on samples (Tempo exemplars)
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+    networks: [backend]
+
+  tempo:
+    image: grafana/tempo:3.1.1
+    command: ["-config.file=/etc/tempo/config.yaml"]
+    volumes:
+      - ./tempo/config.yaml:/etc/tempo/config.yaml:ro
+      - tempo-data:/var/tempo
+    restart: unless-stopped
+    networks: [backend]
+
+  loki:
+    image: grafana/loki:3.7.9
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    restart: unless-stopped
+    networks: [backend]
+
+  grafana:
+    image: grafana/grafana:13.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Local only: nothing is sent to grafana.com, GitHub, Gravatar or snapshot hosts.
+      GF_ANALYTICS_REPORTING_ENABLED: "false" # usage stats to stats.grafana.org
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false" # version check on GitHub
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false" # plugin check on grafana.com
+      GF_ANALYTICS_FEEDBACK_LINKS_ENABLED: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true" # avatars from gravatar.com
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: "false" # snapshot upload to snapshots.raintank.io
+      GF_PLUGINS_PREINSTALL_DISABLED: "true" # plugin downloads on startup
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    restart: unless-stopped
+    networks: [frontend, backend]
+
+networks:
+  backend:
+    internal: true # no route to the internet
+  frontend:
+
+volumes:
+  prometheus-data:
+  tempo-data:
+  loki-data:
+  grafana-data:

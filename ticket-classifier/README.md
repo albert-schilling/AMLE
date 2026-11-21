@@ -85,6 +85,10 @@ Environment variables or `.env`, see [.env.example](.env.example):
 `TRACE_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`,
 `CHECKPOINT_PATH`, `GRAPH_PATH`.
 
+OpenTelemetry (off by default): `OTEL_ENABLED`, `OTEL_SERVICE_NAME`,
+`OTEL_EXPORTER_OTLP_ENDPOINT` (empty prints to the console),
+`OTEL_RESOURCE_ATTRIBUTES`. The local stack: [monitoring/README.md](monitoring/README.md).
+
 ## Layout
 
 | Module | Role |
@@ -100,6 +104,7 @@ Environment variables or `.env`, see [.env.example](.env.example):
 | `customers.py` | customer data access (swap for a DB later) |
 | `storage.py` | read tickets, write or merge results |
 | `trace.py`, `logging_config.py` | JSON lines trace, logger setup |
+| `telemetry.py` | OpenTelemetry: settings to the SDK, start TraceVerde, send our logs |
 | `models/` | data only: `domain.py` (input), `state.py` (graph state), `results.py` (output rows) |
 | `config.py` | settings |
 

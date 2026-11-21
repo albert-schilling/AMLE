@@ -1,0 +1,54 @@
+# Tempo 3 monolithic (single binary): stores the traces the OTel Collector sends.
+# Based on the official example:
+# https://github.com/grafana/tempo/blob/main/example/docker-compose/single-binary/tempo.yaml
+# Tempo 3 has no ingester and no compactor blocks any more; monolithic mode needs no Kafka.
+
+server:
+  http_listen_port: 3200 # API for Grafana, and /ready
+  log_level: info
+
+# Lets Grafana stream TraceQL search results over HTTP.
+stream_over_http_enabled: true
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317 # only the collector sends here (Docker network)
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+# Builds metrics from spans and pushes them to Prometheus (remote write):
+# span-metrics: request count, errors and latency per span, e.g. per graph node.
+# service-graphs: which service calls which.
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true # trace ids on metric samples: jump from a chart to a trace
+
+# Settings per tenant; `defaults` applies to all (we have one).
+overrides:
+  defaults:
+    # Metrics generator processors are off by default.
+    metrics_generator:
+      processors: [span-metrics, service-graphs]
+    # Delete trace blocks older than 14 days (same as the default, set explicitly).
+    # Tempo has no size limit for local storage.
+    compaction:
+      block_retention: 336h
+
+# No usage statistics sent to Grafana Labs: local only.
+usage_report:
+  reporting_enabled: false
