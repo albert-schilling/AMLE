@@ -1,0 +1,168 @@
+{
+  "id": null,
+  "uid": "ticket-classifier-logs",
+  "title": "Ticket Classifier: Logs",
+  "tags": [
+    "ticket-classifier"
+  ],
+  "timezone": "browser",
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "ticket_id",
+        "label": "Ticket id (regex)",
+        "type": "textbox",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "search",
+        "label": "Search text",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "Dashboards",
+      "tags": [
+        "ticket-classifier"
+      ],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Log lines per level",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (severity_text) (count_over_time({service_name=\"ticket-classifier\"} | ticket_id=~\"$ticket_id\" |~ \"(?i)$search\" [$__auto]))",
+          "legendFormat": "{{severity_text}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "bargauge",
+      "title": "Most log lines per ticket",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "topk(10, sum by (ticket_id) (count_over_time({service_name=\"ticket-classifier\"} | ticket_id!=\"\" | ticket_id=~\"$ticket_id\" [$__range])))",
+          "legendFormat": "{{ticket_id}}",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic"
+      }
+    },
+    {
+      "id": 3,
+      "type": "logs",
+      "title": "Log lines",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 24,
+        "h": 16
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=\"ticket-classifier\"} | ticket_id=~\"$ticket_id\" |~ \"(?i)$search\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true
+      }
+    }
+  ]
+}

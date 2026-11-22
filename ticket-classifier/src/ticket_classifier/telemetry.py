@@ -8,8 +8,13 @@ logs, so ``attach_log_handler`` does.
 
 import logging
 import os
+from collections.abc import Generator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from importlib.metadata import version
+from typing import Literal
 
+from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.instrumentation.logging.handler import LoggingHandler
 from opentelemetry.sdk._logs import LoggerProvider
@@ -20,12 +25,24 @@ from opentelemetry.sdk._logs.export import (
 )
 from opentelemetry.sdk.resources import Resource
 
+from .checkpoint import thread_config
 from .config import Settings
+from .models import TriageState
 
 # Only our own loggers go to Loki: not the SDK's export logs (no feedback loop), not
 # TraceVerde's or the Anthropic SDK's.
 APP_LOGGER = "ticket_classifier"
 OTEL_HANDLER_NAME = "ticket_classifier.otel"
+# extra= for a log line with ticket, customer or reviewer text: it stays on the
+# console and is not sent to Loki.
+CONSOLE_ONLY = {"console_only": True}
+
+TicketStatus = Literal["finished", "paused", "failed"]
+
+# A no-op tracer while telemetry is off; becomes real once a provider is set.
+tracer = trace.get_tracer(__name__)
+# ticket_id and thread_id of the ticket being worked on, for its log records.
+TICKET_LOG_FIELDS: ContextVar[dict[str, str]] = ContextVar("ticket_log_fields")
 
 # Fixed for privacy, whatever the environment says: no prompt or answer text in the
 # spans, no data to any endpoint other than our collector, no model downloads, no
@@ -78,7 +95,6 @@ def configure_telemetry(settings: Settings) -> None:
     os.environ.update(telemetry_environment(settings))
 
     import genai_otel  # only when enabled: it sets up global OTel providers
-    from opentelemetry import trace
 
     genai_otel.instrument()
     # The same resource as the traces, so logs and spans name the same service.
@@ -108,7 +124,77 @@ def attach_log_handler(
     for handler in app_logger.handlers[:]:
         if handler.get_name() == OTEL_HANDLER_NAME:
             app_logger.removeHandler(handler)
-    handler = LoggingHandler(logger_provider=provider)
+    # DEBUG lines hold whole graph states, with customer data.
+    handler = LoggingHandler(level=logging.INFO, logger_provider=provider)
     handler.set_name(OTEL_HANDLER_NAME)
+    handler.addFilter(drop_console_only)
+    handler.addFilter(add_ticket_fields)
     app_logger.addHandler(handler)
     return provider
+
+
+def drop_console_only(record: logging.LogRecord) -> bool:
+    """Log filter: keep lines marked ``CONSOLE_ONLY`` out of the export."""
+    return not getattr(record, "console_only", False)
+
+
+def add_ticket_fields(record: logging.LogRecord) -> bool:
+    """Log filter: add the current ticket's ids; they become log attributes."""
+    vars(record).update(TICKET_LOG_FIELDS.get({}))
+    return True
+
+
+@contextmanager
+def ticket_span(
+    ticket_id: str, run_mode: Literal["run", "resume"]
+) -> Generator[trace.Span]:
+    """One ticket's work: a span with its ids, which its log records get too.
+
+    The span name has no ticket id: Tempo turns span names into a metric label.
+    """
+
+    fields = {
+        "ticket_id": ticket_id,
+        "thread_id": thread_config(ticket_id)["configurable"]["thread_id"],
+    }
+    attributes = {**fields, "run_mode": run_mode}
+
+    with tracer.start_as_current_span(
+        f"ticket.{run_mode}", attributes=attributes
+    ) as span:
+        token = TICKET_LOG_FIELDS.set(fields)
+        try:
+            yield span
+        finally:
+            TICKET_LOG_FIELDS.reset(token)
+
+
+def record_classification(state: TriageState) -> None:
+    """Put category and priority on the current span, once the state has them."""
+
+    classification = state.get("classification")
+
+    if classification is not None:
+        trace.get_current_span().set_attributes(
+            {
+                "category": classification.category,
+                "priority": classification.priority,
+            }
+        )
+
+
+def record_status(status: TicketStatus) -> None:
+    """Put the ticket's outcome on its span. A pause is not an error."""
+    trace.get_current_span().set_attribute("ticket.status", status)
+
+
+def record_reused(status: TicketStatus) -> None:
+    """This run did no work on the ticket: it only read the saved status."""
+    record_status(status)
+    trace.get_current_span().set_attribute("ticket.reused", True)
+
+
+def record_pause(node: str) -> None:
+    """Mark the ticket's span, and record the moment this run paused at ``node``."""
+    record_status("paused")
+    trace.get_current_span().add_event("paused", {"node": node})

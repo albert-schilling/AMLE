@@ -1,17 +1,28 @@
+import json
 import logging
 import os
 
 import pytest
-from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
+from helpers import HIGH
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.sdk._logs.export import (
+    ConsoleLogRecordExporter,
+    InMemoryLogRecordExporter,
+)
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 
+from ticket_classifier.cli import main
+from ticket_classifier.client import get_client
 from ticket_classifier.config import Settings
 from ticket_classifier.telemetry import (
     APP_LOGGER,
+    CONSOLE_ONLY,
     OTEL_HANDLER_NAME,
     attach_log_handler,
     configure_telemetry,
+    log_exporter,
+    ticket_span,
 )
 
 
@@ -129,3 +140,120 @@ def test_attaching_twice_keeps_one_handler(exported_logs):
 
     handlers = logging.getLogger(APP_LOGGER).handlers
     assert [h.get_name() for h in handlers].count(OTEL_HANDLER_NAME) == 1
+
+
+def test_log_inside_ticket_span_gets_ticket_ids(exported_logs):
+    log = logging.getLogger("ticket_classifier.runner")
+    with ticket_span("T-3", "run"):
+        log.warning("inside")
+    log.warning("outside")
+
+    inside, outside = exported_logs()
+    assert inside.attributes["ticket_id"] == "T-3"
+    assert inside.attributes["thread_id"] == "T-3"
+    assert "ticket_id" not in outside.attributes
+
+
+def test_ticket_ids_are_cleared_after_an_error(exported_logs):
+    log = logging.getLogger("ticket_classifier.runner")
+    with pytest.raises(ValueError), ticket_span("T-3", "run"):
+        raise ValueError("boom")
+    log.warning("after")
+
+    (record,) = exported_logs()
+    assert "ticket_id" not in record.attributes
+
+
+def test_debug_lines_are_not_exported(exported_logs):
+    logging.getLogger(APP_LOGGER).setLevel(logging.DEBUG)
+    logging.getLogger("ticket_classifier.runner").debug("whole state")
+
+    assert exported_logs() == []
+
+
+def test_console_only_line_is_not_exported_but_still_logged(exported_logs, caplog):
+    with caplog.at_level(logging.INFO):
+        logging.getLogger("ticket_classifier.runner").info(
+            "secret text", extra=CONSOLE_ONLY
+        )
+
+    assert exported_logs() == []
+    assert "secret text" in caplog.text
+
+
+def test_run_and_resume_export_no_ticket_or_customer_text(
+    model, write_tickets, exported_logs, monkeypatch
+):
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    model.outcomes["private ticket text"] = HIGH
+    tickets = write_tickets([{"id": "T-1", "text": "private ticket text"}])
+
+    main(["run", str(tickets)])
+    main(["resume", "T-1", "--approve", "--note", "private reviewer note"])
+
+    bodies = " ".join(str(record.body) for record in exported_logs())
+    assert "T-1" in bodies
+    for private in ("private ticket text", "private reviewer note", "alice@"):
+        assert private not in bodies
+
+
+def test_client_sends_no_trace_headers_to_anthropic():
+    get_client.cache_clear()
+
+    assert get_client().open_telemetry["propagation"] is False
+
+    get_client.cache_clear()
+
+
+def test_malformed_customer_is_not_exported(
+    model, write_tickets, exported_logs, customers_file
+):
+    customers_file.write_text(
+        json.dumps({"1001": {"id": "1001", "email": "private@example.com"}})
+    )
+    tickets = write_tickets([{"id": "T-1", "customer_id": "1001", "text": "x"}])
+
+    main(["run", str(tickets)])
+
+    records = exported_logs()
+    exported = " ".join(f"{r.body} {dict(r.attributes)}" for r in records)
+    assert "continues without customer data" in exported
+    assert "private@example.com" not in exported
+
+
+def test_logs_go_to_console_without_endpoint(monkeypatch):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+
+    assert isinstance(log_exporter(Settings()), ConsoleLogRecordExporter)
+
+
+def test_logs_go_to_collector_with_endpoint():
+    assert isinstance(log_exporter(Settings()), OTLPLogExporter)
+
+
+def test_logs_use_the_same_resource_as_traces(instrument, monkeypatch, mocker):
+    monkeypatch.setenv("OTEL_ENABLED", "true")
+    provider = mocker.patch("opentelemetry.trace.get_tracer_provider").return_value
+    attach = mocker.patch("ticket_classifier.telemetry.attach_log_handler")
+
+    configure_telemetry(Settings())
+
+    assert attach.call_args.args[1] is provider.resource
+
+
+def test_disabled_telemetry_attaches_no_log_handler(model, write_tickets):
+    main(["run", str(write_tickets([{"id": "T-1", "text": "calm"}]))])
+
+    handlers = logging.getLogger(APP_LOGGER).handlers
+    assert OTEL_HANDLER_NAME not in [handler.get_name() for handler in handlers]
+
+
+def test_run_and_resume_logs_share_ticket_id_across_two_traces(
+    model, write_tickets, exported_logs, finished_spans
+):
+    model.outcomes["urgent"] = HIGH
+    main(["run", str(write_tickets([{"id": "T-1", "text": "urgent"}]))])
+    main(["resume", "T-1", "--approve", "--note", "ok"])
+
+    records = [r for r in exported_logs() if r.attributes.get("ticket_id") == "T-1"]
+    assert len({record.trace_id for record in records}) == 2

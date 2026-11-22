@@ -30,4 +30,4 @@ def test_malformed_customer_record_is_logged(customers_file, make_ticket, caplog
     update = node_get_customer({"ticket": make_ticket(customer_id="1001")})
 
     assert update == {"customer": None}
-    assert caplog.records[-1].levelno == logging.ERROR
+    assert any(record.levelno == logging.ERROR for record in caplog.records)

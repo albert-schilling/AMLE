@@ -36,6 +36,7 @@ services:
       - "--web.enable-otlp-receiver" # accept OTLP pushes at /api/v1/otlp/v1/metrics
       - "--web.enable-remote-write-receiver" # Tempo pushes span metrics at /api/v1/write
       - "--enable-feature=exemplar-storage" # keep trace ids on samples (Tempo exemplars)
+      - "--enable-feature=otlp-native-delta-ingestion" # experimental; short CLI runs
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -76,6 +77,7 @@ services:
       GF_PLUGINS_PREINSTALL_DISABLED: "true" # plugin downloads on startup
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
       - "127.0.0.1:3000:3000"

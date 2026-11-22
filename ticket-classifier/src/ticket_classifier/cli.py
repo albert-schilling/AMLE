@@ -1,5 +1,6 @@
 import logging
 
+from opentelemetry import trace
 from pydantic import ValidationError
 
 from . import commands
@@ -8,9 +9,11 @@ from .config import Settings, get_settings
 from .logging_config import configure_logging
 from .runner import NotPausedError
 from .storage import load_tickets
-from .telemetry import configure_telemetry
+from .telemetry import CONSOLE_ONLY, configure_telemetry
 
 logger = logging.getLogger(__name__)
+# A no-op tracer while telemetry is off; becomes real once a provider is set.
+tracer = trace.get_tracer(__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,11 +24,14 @@ def main(argv: list[str] | None = None) -> int:
     configure_logging(settings)
     configure_telemetry(settings)  # before the first Anthropic client is created
 
+    # Root span of the command: every span and log line of this process is in it.
     match args:
         case RunArgs():
-            return handle_run(args, settings)
+            with tracer.start_as_current_span("ticket-classifier run"):
+                return handle_run(args, settings)
         case ResumeArgs():
-            return handle_resume(args, settings)
+            with tracer.start_as_current_span("ticket-classifier resume"):
+                return handle_resume(args, settings)
 
 
 def handle_run(args: RunArgs, settings: Settings) -> int:
@@ -34,7 +40,13 @@ def handle_run(args: RunArgs, settings: Settings) -> int:
     try:
         tickets = load_tickets(tickets_path)
     except (OSError, ValidationError) as error:
-        logger.error("Cannot load tickets from %s: %s", tickets_path, error)
+        # A validation error can quote the ticket text.
+        logger.error(
+            "Cannot load tickets from %s: %s",
+            tickets_path,
+            error,
+            extra=CONSOLE_ONLY,
+        )
         return 2
     logger.info("Loaded %d tickets from %s", len(tickets), tickets_path)
 

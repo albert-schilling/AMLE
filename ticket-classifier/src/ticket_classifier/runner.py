@@ -7,6 +7,7 @@ from anthropic import APIError
 from langgraph.graph import END
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
+from opentelemetry.trace import Status, StatusCode
 
 from .checkpoint import run_status, thread_config
 from .models import (
@@ -19,6 +20,14 @@ from .models import (
     TriageState,
 )
 from .nodes import TriageError
+from .telemetry import (
+    CONSOLE_ONLY,
+    record_classification,
+    record_pause,
+    record_reused,
+    record_status,
+    ticket_span,
+)
 from .trace import trace_event
 
 logger = logging.getLogger(__name__)
@@ -39,18 +48,23 @@ def run_all(tickets: list[Ticket], *, workflow: CompiledStateGraph) -> BatchResu
     """Run every ticket; a failing ticket is recorded and skipped."""
     batch = BatchResult()
     for ticket in tickets:
-        try:
-            result = run_ticket(workflow, ticket)
-        except (APIError, TriageError) as error:
-            batch.failed.append(ticket.id)
-            logger.error("Ticket %s failed: %s", ticket.id, error)
-            continue
+        with ticket_span(ticket.id, "run") as span:
+            try:
+                result = run_ticket(workflow, ticket)
+            except (APIError, TriageError) as error:
+                batch.failed.append(ticket.id)
+                logger.error("Ticket %s failed: %s", ticket.id, error)
+                record_status("failed")
+                span.record_exception(error)
+                span.set_status(Status(StatusCode.ERROR, str(error)))
+                continue
 
-        if result is None:
-            batch.paused.append(ticket.id)
-            continue
-        logger.info("Ticket %s done, result=%s", ticket.id, result["classification"])
-        batch.classified.append(to_classified_ticket(result))
+            if result is None:
+                batch.paused.append(ticket.id)
+                continue
+            classification = result["classification"]
+            logger.info("Ticket %s done, result=%s", ticket.id, classification)
+            batch.classified.append(to_classified_ticket(result))
     return batch
 
 
@@ -62,8 +76,11 @@ def run_ticket(workflow: CompiledStateGraph, ticket: Ticket) -> TriageState | No
     """
     saved = workflow.get_state(thread_config(ticket.id))
 
+    record_classification(saved.values)  # a paused or finished run has one already
+
     match run_status(saved):
         case "paused":
+            record_reused("paused")
             logger.info("Ticket %s is still waiting for a human answer", ticket.id)
             return None
         case "unfinished":
@@ -71,6 +88,7 @@ def run_ticket(workflow: CompiledStateGraph, ticket: Ticket) -> TriageState | No
             logger.info("Continuing unfinished run of ticket %s", ticket.id)
             return run_thread(workflow, None, ticket.id)
         case "finished":
+            record_reused("finished")
             logger.info("Ticket %s already finished, using the saved result", ticket.id)
             return saved.values
         case "new":
@@ -90,7 +108,8 @@ def resume_ticket(
     if run_status(saved) != "paused":
         raise NotPausedError(f"Ticket {ticket_id} has no paused run")
 
-    logger.info("Resuming ticket %s with %r", ticket_id, answer)
+    logger.info("Resuming ticket %s with %r", ticket_id, answer, extra=CONSOLE_ONLY)
+
     return run_thread(workflow, Command(resume=answer), ticket_id)
 
 
@@ -121,11 +140,18 @@ def run_thread(
                 trace_event(ticket_id, node_name, "updated", update)
 
     state = workflow.get_state(config)
+
+    record_classification(state.values)
+
     if state.interrupts:
         requests = [item.value for item in state.interrupts]
-        logger.info("Ticket %s needs a human: %s", ticket_id, requests)
+        logger.info(
+            "Ticket %s needs a human: %s", ticket_id, requests, extra=CONSOLE_ONLY
+        )
         trace_event(ticket_id, state.next[0], "paused", {"requests": requests})
+        record_pause(state.next[0])
         return None
+    record_status("finished")
     trace_event(ticket_id, END, "finished", state.values)
     return state.values
 

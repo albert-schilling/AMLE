@@ -75,29 +75,46 @@ Storage: 14 days in Prometheus (also max 1 GB), Tempo and Loki. Diagrams and det
 
 ## Phase C: what to measure
 
-14. [ ] Our own spans, two levels: a root span per CLI command (`run`, `resume`) and
+14. [x] Our own spans, two levels: a root span per CLI command (`run`, `resume`) and
     a child span per ticket in `runner.py`. TraceVerde's graph and node spans hang
     below. Then every log line of a command has a `trace_id`, also the batch
     summary. Node spans come from TraceVerde; no logging or span code in nodes.
-15. [ ] Ticket span attributes: `ticket_id`, `thread_id`, category, priority, run vs
-    resume. `ticket_id` and `thread_id` also on every log line inside the ticket span,
-    automatically (logging filter + `contextvar`, no `extra=` by hand). This links
-    `run` and `resume` of one ticket in Loki, across two traces.
-16. [ ] Tokens and cost: `gen_ai.client.inference.usage.*` and
-    `gen_ai.usage.cost.total` in Prometheus. Turn off TraceVerde's unused
-    `gen_ai.server.*` gauges if possible.
-17. [ ] Human in the loop: either the `interrupt()` pause is an error span on purpose,
-    or a `paused` span event plus a log line.
-18. [ ] `trace.jsonl`: `trace_event()` becomes a structured log record (`ticket_id`,
-    `node`, `event` as attributes) sent to Loki; keep the file as a fallback switch.
+    Checked in Tempo and Loki: all log lines of a resume share the trace id and
+    point to the right span. A failed ticket's span is ERROR.
+15. [x] Ticket span attributes: `ticket_id`, `thread_id`, `category`, `priority`,
+    `run_mode` (`run` or `resume`). `ticket_id` and `thread_id` also on every log line
+    inside the ticket span, automatically (logging filter + `contextvar`, no `extra=`
+    by hand). This links `run` and `resume` of one ticket in Loki, across two traces.
+    Checked in Tempo and Loki with a `run` without model calls. Not yet checked: one
+    ticket's `run` and `resume` lines together in Loki.
+16. [x] Tokens and cost in Prometheus: the Anthropic SDK writes its own spans, so
+    TraceVerde records no token metrics. The collector's `signal_to_metrics`
+    connector derives `llm_calls_total`, `llm_input_tokens_total`,
+    `llm_output_tokens_total` and `llm_cost_usd_total` from the span attributes.
+    Privacy: no `traceparent` header to Anthropic; only INFO and above go to Loki;
+    lines with ticket, customer or reviewer text are `CONSOLE_ONLY`. Checked with
+    the real app against a fake API. Open: TraceVerde's unused `gen_ai.server.*`
+    gauges are still exported.
+17. [x] Human in the loop: a pause is not an error. The ticket span gets
+    `ticket.status=paused` and, when the run pauses, a `paused` event with the node.
+    TraceVerde does not mark `interrupt()` as an error either, so the error rate
+    stays clean. Find waiting tickets with `{span.ticket.status="paused"}`.
+18. [x] `trace.jsonl` stays a local file and is not sent to Loki: its `data` holds full
+    graph states with ticket, customer and reviewer text. Loki has the workflow lines,
+    Tempo the node timing.
 
 ## Phase D: dashboard and tests
 
-19. [ ] Provisioned Grafana dashboard (JSON): tickets per category and priority,
-    latency per node, tokens and cost per run, paused count, Loki panel with
-    warnings and errors filtered by `ticket_id`.
-20. [ ] Tests with `InMemorySpanExporter` and `InMemoryLogExporter`: span names and
-    attributes, log records with `ticket_id` and `trace_id`. No API call.
-21. [ ] README: start the stack, URLs, env vars, log to trace navigation.
+19. [x] Provisioned Grafana dashboard `monitoring/grafana/dashboards/ticket-classifier.json`:
+    ticket runs, paused, resumed, failed, error rate, cost, tickets by category and
+    priority, p95 latency per node, model calls, tokens, warnings and errors with a
+    `ticket_id` filter. Ticket spans carry `ticket.status` (`finished`, `paused`,
+    `failed`); `ticket.reused` marks runs that did no work, which are not counted.
+    Prometheus stores the connector's deltas as is (`otlp-native-delta-ingestion`,
+    experimental), so these metrics use `sum_over_time`, not `increase`.
+20. [x] Tests with `InMemorySpanExporter` and `InMemoryLogRecordExporter`: span names
+    and attributes, log records with `ticket_id` and `trace_id`, exporter choice, no
+    private text in spans or logs. No API call.
+21. [x] README: start the stack, URLs, env vars, log to trace navigation.
 
 Steps 1-13 need no API calls. Token and cost metrics need `make run` (costs money).

@@ -15,7 +15,8 @@ START → get_customer → triage → high priority? → human_review → END
 - Each ticket is its own thread; runs are saved in SQLite and survive a crash or exit.
 - Every workflow event (node update, pause, finish) is appended as one JSON line to
   `TRACE_FILE` (default `output/trace.jsonl`), with `ticket_id`, `node`, `event` and
-  `data`. The graph is saved as mermaid to `GRAPH_PATH`.
+  `data`. This file holds ticket, customer and reviewer text; it stays local and is
+  not sent to the monitoring stack. The graph is saved as mermaid to `GRAPH_PATH`.
 
 ## Setup
 
@@ -77,6 +78,23 @@ Customers are read from `CUSTOMERS_PATH` (JSON object keyed by customer id).
 [{"ticket_id": "T-1", "customer_id": "1001", "category": "billing",
   "priority": "high", "escalated": false, "escalation_reason": null}]
 ```
+
+## Observability
+
+Traces, metrics and logs go to a local Docker stack (OpenTelemetry Collector, Tempo,
+Prometheus, Loki, Grafana). Telemetry is off by default.
+
+```sh
+make obs-up                     # start the stack
+make obs-check                  # all services ready?
+OTEL_ENABLED=true make run      # calls the Anthropic API
+```
+
+Dashboards (user `admin`): [metrics](http://localhost:3000/d/ticket-classifier),
+[traces](http://localhost:3000/d/ticket-classifier-traces),
+[logs](http://localhost:3000/d/ticket-classifier-logs). Set `OTEL_ENABLED=true` in
+`.env` to keep telemetry on. Details, diagrams and a query cookbook:
+[monitoring/README.md](monitoring/README.md).
 
 ## Configuration
 

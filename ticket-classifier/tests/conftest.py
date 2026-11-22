@@ -2,6 +2,10 @@ import json
 
 import pytest
 from helpers import LOW
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from ticket_classifier import customers
 from ticket_classifier.config import get_settings
@@ -90,3 +94,20 @@ def model(mocker, customers_file):
     client.messages.parse.side_effect = parse
     client.messages.parse.outcomes = outcomes
     return client.messages.parse
+
+
+# The global tracer provider can be set only once per process, so all tests share
+# one in-memory exporter; the fixture empties it per test.
+SPAN_EXPORTER = InMemorySpanExporter()
+
+
+@pytest.fixture
+def finished_spans():
+    """Spans our code ended during the test, oldest first."""
+    if not isinstance(trace.get_tracer_provider(), TracerProvider):
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(SPAN_EXPORTER))
+        trace.set_tracer_provider(provider)
+    SPAN_EXPORTER.clear()
+    yield SPAN_EXPORTER.get_finished_spans
+    SPAN_EXPORTER.clear()

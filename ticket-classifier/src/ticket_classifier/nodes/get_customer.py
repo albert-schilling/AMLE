@@ -4,6 +4,7 @@ from pydantic import ValidationError
 
 from ..customers import get_customer
 from ..models import TriageState
+from ..telemetry import CONSOLE_ONLY
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,11 @@ def node_get_customer(state: TriageState) -> TriageState:
     try:
         customer = get_customer(ticket.customer_id)
     except OSError, ValidationError:
-        logger.exception("Cannot read customer %s", ticket.customer_id)
+        # The traceback can quote the customer record, so it stays on the console.
+        logger.exception(
+            "Cannot read customer %s", ticket.customer_id, extra=CONSOLE_ONLY
+        )
+        logger.warning("Ticket %s continues without customer data", ticket.id)
         return {"customer": None}
 
     if customer is None:

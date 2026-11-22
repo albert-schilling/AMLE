@@ -1,0 +1,193 @@
+{
+  "id": null,
+  "uid": "ticket-classifier-traces",
+  "title": "Ticket Classifier: Traces",
+  "tags": [
+    "ticket-classifier"
+  ],
+  "timezone": "browser",
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "ticket_id",
+        "label": "Ticket id (regex)",
+        "type": "textbox",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "Dashboards",
+      "tags": [
+        "ticket-classifier"
+      ],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Ticket runs that did work",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"ticket-classifier\" && name=~\"ticket\\\\.(run|resume)\" && span.ticket.reused = nil && span.ticket_id=~\"$ticket_id\"} | select(span.ticket_id, span.run_mode, span.ticket.status, span.category, span.priority)",
+          "tableType": "spans",
+          "limit": 50,
+          "spss": 10,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Paused for a human",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"ticket-classifier\" && span.ticket.status=\"paused\" && span.ticket.reused = nil && span.ticket_id=~\"$ticket_id\"} | select(span.ticket_id, span.run_mode, span.ticket.status, span.category, span.priority)",
+          "tableType": "spans",
+          "limit": 50,
+          "spss": 10,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Failed tickets",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"ticket-classifier\" && name=~\"ticket\\\\.(run|resume)\" && status=error && span.ticket_id=~\"$ticket_id\"} | select(span.ticket_id, span.run_mode, span.ticket.status, span.category, span.priority)",
+          "tableType": "spans",
+          "limit": 50,
+          "spss": 10,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Model calls over 1 s",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"ticket-classifier\" && name=\"anthropic.messages.create\" && duration > 1s}",
+          "tableType": "spans",
+          "limit": 50,
+          "spss": 10,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    }
+  ]
+}

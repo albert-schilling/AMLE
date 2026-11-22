@@ -8,6 +8,7 @@ from .graph import build_workflow, write_mermaid
 from .models import ClassifiedTicket, HumanAnswer, Ticket
 from .runner import BatchResult, resume_ticket, run_all, to_classified_ticket
 from .storage import merge_results, save_results
+from .telemetry import ticket_span
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +57,16 @@ def resume(
     Returns None if the run pauses again. Raises ``NotPausedError`` if the ticket has
     no paused run.
     """
-    with open_checkpointer(settings.checkpoint_path) as checkpointer:
-        workflow = build_workflow(checkpointer)
-        result = resume_ticket(workflow, ticket_id, answer)
+    with ticket_span(ticket_id, "resume"):
+        with open_checkpointer(settings.checkpoint_path) as checkpointer:
+            workflow = build_workflow(checkpointer)
+            result = resume_ticket(workflow, ticket_id, answer)
 
-    if result is None:
-        logger.info("Ticket %s is paused again", ticket_id)
-        return None
+        if result is None:
+            logger.info("Ticket %s is paused again", ticket_id)
+            return None
 
-    classified = to_classified_ticket(result)
-    merge_results([classified], settings.results_path)
-    logger.info("Ticket %s done, results in %s", ticket_id, settings.results_path)
-    return classified
+        classified = to_classified_ticket(result)
+        merge_results([classified], settings.results_path)
+        logger.info("Ticket %s done, results in %s", ticket_id, settings.results_path)
+        return classified

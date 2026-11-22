@@ -39,6 +39,73 @@ exporters:
   debug:
     verbosity: basic
 
+connectors:
+  # The Anthropic SDK writes tokens and cost on its spans but records no metrics, so
+  # they are derived here. Output is delta: Prometheus stores it as is (see
+  # otlp-native-delta-ingestion), so query it with sum_over_time, not increase.
+  # Without service.instance.id, all runs add up in the same series.
+  # Docs: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/signaltometricsconnector
+  signal_to_metrics:
+    spans:
+      - name: llm.calls
+        description: Model calls
+        conditions:
+          - span.attributes["gen_ai.usage.input_tokens"] != nil
+        include_resource_attributes: &llm_resource
+          - key: service.name
+          - key: service.namespace
+          - key: service.version
+          - key: deployment.environment.name
+        attributes: &llm_attributes
+          - key: gen_ai.request.model
+        sum:
+          value: Int(AdjustedCount())
+          monotonic: true
+      - name: llm.input.tokens
+        description: Input tokens
+        conditions:
+          - span.attributes["gen_ai.usage.input_tokens"] != nil
+        include_resource_attributes: *llm_resource
+        attributes: *llm_attributes
+        sum:
+          value: Int(span.attributes["gen_ai.usage.input_tokens"])
+          monotonic: true
+      - name: llm.output.tokens
+        description: Output tokens
+        conditions:
+          - span.attributes["gen_ai.usage.output_tokens"] != nil
+        include_resource_attributes: *llm_resource
+        attributes: *llm_attributes
+        sum:
+          value: Int(span.attributes["gen_ai.usage.output_tokens"])
+          monotonic: true
+      - name: llm.cost.usd
+        description: Estimated cost in USD
+        conditions:
+          - span.attributes["gen_ai.usage.cost.total"] != nil
+        include_resource_attributes: *llm_resource
+        attributes: *llm_attributes
+        sum:
+          value: Double(span.attributes["gen_ai.usage.cost.total"])
+          monotonic: true
+      # Ticket runs that did work; a run that only read a saved result is not counted.
+      - name: tickets.runs
+        description: Ticket runs by outcome
+        conditions:
+          - 'IsMatch(span.name, "^ticket\\.(run|resume)$") and span.attributes["ticket.reused"] == nil'
+        include_resource_attributes: *llm_resource
+        attributes:
+          - key: run_mode
+          - key: ticket.status
+            default_value: unknown
+          - key: category
+            default_value: unknown
+          - key: priority
+            default_value: unknown
+        sum:
+          value: Int(AdjustedCount())
+          monotonic: true
+
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
@@ -53,7 +120,11 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [otlp_grpc/tempo, debug]
+      exporters: [otlp_grpc/tempo, signal_to_metrics, debug]
+    metrics/from_spans:
+      receivers: [signal_to_metrics]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/prometheus, debug]
     logs:
       receivers: [otlp]
       processors: [memory_limiter, batch]

@@ -1,0 +1,13 @@
+# Loads the dashboards in monitoring/grafana/dashboards at startup.
+# Docs: https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards
+
+apiVersion: 1
+
+providers:
+  - name: ticket-classifier
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30 # polls: file events are unreliable on Docker bind mounts
+    allowUiUpdates: false # the JSON file is the source of truth
+    options:
+      path: /etc/grafana/dashboards

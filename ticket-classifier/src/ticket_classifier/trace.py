@@ -1,4 +1,7 @@
-"""JSON lines trace: one record per workflow event, for later analysis."""
+"""JSON lines trace: one record per workflow event, for later analysis.
+
+Records hold ticket, customer and reviewer text, so this file is never exported.
+"""
 
 import json
 from datetime import UTC, datetime

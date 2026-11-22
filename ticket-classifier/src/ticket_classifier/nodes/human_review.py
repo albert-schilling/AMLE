@@ -9,6 +9,7 @@ from ..models import (
     NotEscalated,
     TriageState,
 )
+from ..telemetry import CONSOLE_ONLY
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,9 @@ def node_human_review(state: TriageState) -> TriageState:
     """Pause the run until a person answers with a ``HumanAnswer``."""
     # Runs again on resume: everything above interrupt() must be safe to repeat.
     answer: HumanAnswer = interrupt(escalation_request(state))
-    logger.info("Ticket %s human answer: %r", state["ticket"].id, answer)
+    logger.info(
+        "Ticket %s human answer: %r", state["ticket"].id, answer, extra=CONSOLE_ONLY
+    )
 
     if answer["approved"]:
         reason = answer["note"] or "High priority ticket"
