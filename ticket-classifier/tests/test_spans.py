@@ -1,6 +1,9 @@
+import pytest
 from helpers import HIGH
+from pydantic import ValidationError
 
 from ticket_classifier.cli import main
+from ticket_classifier.models import TicketClassification
 
 
 def by_name(spans, name):
@@ -187,3 +190,33 @@ def test_resume_without_paused_run_marks_span_as_error(model, finished_spans):
     (span,) = by_name(finished_spans(), "ticket.resume")
     assert span.attributes["ticket_id"] == "T-404"
     assert span.status.status_code.name == "ERROR"
+
+
+def test_invalid_model_output_fails_one_ticket_without_its_text(
+    model, write_tickets, finished_spans
+):
+    with pytest.raises(ValidationError) as caught:
+        TicketClassification.model_validate_json("private model text")
+    model.outcomes["bad output"] = caught.value
+    tickets = write_tickets(
+        [{"id": "T-1", "text": "bad output"}, {"id": "T-2", "text": "fine"}]
+    )
+
+    assert main(["run", str(tickets)]) == 1
+
+    failed, fine = by_name(finished_spans(), "ticket.run")
+    assert failed.attributes["ticket.status"] == "failed"
+    assert fine.attributes["ticket.status"] == "finished"
+    assert "private model text" not in failed.to_json()
+
+
+def test_failure_span_has_error_type_but_not_its_text(
+    model, write_tickets, finished_spans
+):
+    model.outcomes["broken"] = None
+    main(["run", str(write_tickets([{"id": "T-1", "text": "broken"}]))])
+
+    (span,) = by_name(finished_spans(), "ticket.run")
+    assert span.status.description == "TriageError"
+    assert span.events[0].attributes["exception.type"] == "TriageError"
+    assert "exception.message" not in span.events[0].attributes

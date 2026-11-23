@@ -24,6 +24,8 @@ from opentelemetry.sdk._logs.export import (
     LogRecordExporter,
 )
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.trace import Status, StatusCode
 
 from .checkpoint import thread_config
 from .config import Settings
@@ -33,9 +35,10 @@ from .models import TriageState
 # TraceVerde's or the Anthropic SDK's.
 APP_LOGGER = "ticket_classifier"
 OTEL_HANDLER_NAME = "ticket_classifier.otel"
-# extra= for a log line with ticket, customer or reviewer text: it stays on the
-# console and is not sent to Loki.
-CONSOLE_ONLY = {"console_only": True}
+# Marks a log line as safe for Loki: only ids, counts and labels, never file paths or
+# ticket, customer, reviewer or error text. Use it through ``get_loggers``; unmarked
+# lines stay on the console.
+EXPORT_LOG = {"export_log": True}
 
 TicketStatus = Literal["finished", "paused", "failed"]
 
@@ -48,11 +51,25 @@ TICKET_LOG_FIELDS: ContextVar[dict[str, str]] = ContextVar("ticket_log_fields")
 # spans, no data to any endpoint other than our collector, no model downloads, no
 # usage report to the TraceVerde maintainers.
 PRIVACY_ENVIRONMENT = {
+    "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "NO_CONTENT",
     "GENAI_ENABLE_CONTENT_CAPTURE": "false",
+    "GENAI_OTEL_MEDIA_CAPTURE_MODE": "off",
+    "GENAI_CAPTURE_RESPONSE_HEADERS": "",
+    "GENAI_ROUTER_RESPONSE_HEADERS": "",
     "GENAI_ALLOW_EXTERNAL_EGRESS": "false",
     "GENAI_AIR_GAPPED": "true",
     "TRACEVERDE_TELEMETRY": "false",
 }
+
+# These would send telemetry past OTEL_EXPORTER_OTLP_ENDPOINT or add credentials.
+OTLP_OVERRIDES = (
+    "OTEL_EXPORTER_OTLP_HEADERS",
+    *(
+        f"OTEL_EXPORTER_OTLP_{signal}_{option}"
+        for signal in ("TRACES", "METRICS", "LOGS")
+        for option in ("ENDPOINT", "HEADERS", "PROTOCOL")
+    ),
+)
 
 # Only what this app uses: no GPU polling, no database or HTTP client spans.
 SCOPE_ENVIRONMENT = {
@@ -62,6 +79,10 @@ SCOPE_ENVIRONMENT = {
     # TraceVerde turns exemplars off by default; they link metrics to traces.
     "OTEL_METRICS_EXEMPLAR_FILTER": "trace_based",
 }
+
+
+class TelemetrySetupError(RuntimeError):
+    """Telemetry is on, but TraceVerde could not set it up."""
 
 
 def telemetry_environment(settings: Settings) -> dict[str, str]:
@@ -88,18 +109,22 @@ def configure_telemetry(settings: Settings) -> None:
     """Start traces, metrics and logs if ``otel_enabled``; otherwise do nothing.
 
     The SDK reads only ``os.environ``, not ``.env``, so the settings are written
-    there first.
+    there first. Raises ``TelemetrySetupError`` if TraceVerde could not start.
     """
     if not settings.otel_enabled:
         return
+    for name in OTLP_OVERRIDES:
+        os.environ.pop(name, None)
     os.environ.update(telemetry_environment(settings))
 
     import genai_otel  # only when enabled: it sets up global OTel providers
 
     genai_otel.instrument()
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):  # it logs setup errors, no raise
+        raise TelemetrySetupError("TraceVerde could not start, see the log above")
     # The same resource as the traces, so logs and spans name the same service.
-    resource = trace.get_tracer_provider().resource
-    attach_log_handler(log_exporter(settings), resource)
+    attach_log_handler(log_exporter(settings), provider.resource)
 
 
 def log_exporter(settings: Settings) -> LogRecordExporter:
@@ -121,21 +146,29 @@ def attach_log_handler(
     provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
 
     app_logger = logging.getLogger(APP_LOGGER)
-    for handler in app_logger.handlers[:]:
-        if handler.get_name() == OTEL_HANDLER_NAME:
-            app_logger.removeHandler(handler)
-    # DEBUG lines hold whole graph states, with customer data.
+    for old_handler in app_logger.handlers[:]:
+        if old_handler.get_name() == OTEL_HANDLER_NAME:
+            app_logger.removeHandler(old_handler)
     handler = LoggingHandler(level=logging.INFO, logger_provider=provider)
     handler.set_name(OTEL_HANDLER_NAME)
-    handler.addFilter(drop_console_only)
+    handler.addFilter(export_marked_only)
     handler.addFilter(add_ticket_fields)
     app_logger.addHandler(handler)
     return provider
 
 
-def drop_console_only(record: logging.LogRecord) -> bool:
-    """Log filter: keep lines marked ``CONSOLE_ONLY`` out of the export."""
-    return not getattr(record, "console_only", False)
+def get_loggers(name: str) -> tuple[logging.Logger, logging.LoggerAdapter]:
+    """Two loggers for a module: console only, and console plus Loki.
+
+    Use the second only for ids, counts and labels.
+    """
+    logger = logging.getLogger(name)
+    return logger, logging.LoggerAdapter(logger, EXPORT_LOG)
+
+
+def export_marked_only(record: logging.LogRecord) -> bool:
+    """Log filter: export only lines marked ``EXPORT_LOG``, without the marker."""
+    return bool(vars(record).pop("export_log", False))
 
 
 def add_ticket_fields(record: logging.LogRecord) -> bool:
@@ -186,6 +219,15 @@ def record_classification(state: TriageState) -> None:
 def record_status(status: TicketStatus) -> None:
     """Put the ticket's outcome on its span. A pause is not an error."""
     trace.get_current_span().set_attribute("ticket.status", status)
+
+
+def record_failure(error: Exception) -> None:
+    """Mark the ticket as failed. Only the error type: its text can quote data."""
+    error_type = type(error).__name__
+    record_status("failed")
+    span = trace.get_current_span()
+    span.add_event("exception", {"exception.type": error_type})
+    span.set_status(Status(StatusCode.ERROR, error_type))
 
 
 def record_reused(status: TicketStatus) -> None:

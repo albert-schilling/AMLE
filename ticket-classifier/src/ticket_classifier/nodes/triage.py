@@ -1,6 +1,7 @@
 from typing import Any
 
 from langgraph.types import StreamWriter
+from pydantic import ValidationError
 
 from ..client import get_client
 from ..config import get_settings
@@ -9,7 +10,7 @@ from ..prompts import SYSTEM_PROMPT, create_prompt
 
 
 class TriageError(RuntimeError):
-    """The model gave no classification, e.g. a refusal or hitting max_tokens."""
+    """The model gave no valid classification, e.g. a refusal or hitting max_tokens."""
 
 
 def ignore_event(event: Any) -> None:
@@ -25,15 +26,19 @@ def node_triage(state: TriageState, writer: StreamWriter = ignore_event) -> Tria
 
     client = get_client()
 
-    output = client.messages.parse(
-        model=settings.model,
-        max_tokens=settings.max_tokens,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {"role": "user", "content": create_prompt(ticket, state["customer"])}
-        ],
-        output_format=TicketClassification,
-    )
+    try:
+        output = client.messages.parse(
+            model=settings.model,
+            max_tokens=settings.max_tokens,
+            system=SYSTEM_PROMPT,
+            messages=[
+                {"role": "user", "content": create_prompt(ticket, state["customer"])}
+            ],
+            output_format=TicketClassification,
+        )
+    except ValidationError:
+        # "from None": the validation error quotes the model's text.
+        raise TriageError(f"Invalid model output for ticket {ticket.id}") from None
 
     if output.parsed_output is None:
         raise TriageError(

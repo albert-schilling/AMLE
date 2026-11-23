@@ -13,7 +13,11 @@ def get_client() -> Anthropic:
     key = get_settings().anthropic_api_key
     if key is None:
         raise RuntimeError("ANTHROPIC_API_KEY is not set")
-    # No trace headers to Anthropic: trace ids stay on this machine.
+    # No trace headers to Anthropic, and no prompt or answer text on spans.
     return Anthropic(
-        api_key=key.get_secret_value(), open_telemetry={"propagation": False}
+        api_key=key.get_secret_value(),
+        open_telemetry={
+            "propagation": False,
+            "traces": {"content_mode": "metadata_only"},
+        },
     )

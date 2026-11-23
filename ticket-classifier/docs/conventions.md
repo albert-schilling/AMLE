@@ -28,6 +28,14 @@ Write clean code for humans: code a reader understands on the first pass.
 - The checkpointer is passed to `build_workflow`, never created inside it.
 - `cli.py` maps commands to exit codes; the work happens in `commands.py`.
 
+## Logging
+
+- `logger, safe_log = get_loggers(__name__)`: `logger` writes to the console only,
+  `safe_log` also sends the line to Loki.
+- Use `safe_log` only for ids, counts and labels: never file paths or ticket, customer,
+  reviewer or error text.
+- For a caught error, log its type with `safe_log` and the full error with `logger`.
+
 ## Types
 
 - A `TypedDict` has no defaults: mark keys that may be missing with `NotRequired`.

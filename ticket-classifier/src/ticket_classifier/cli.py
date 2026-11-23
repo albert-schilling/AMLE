@@ -1,5 +1,3 @@
-import logging
-
 from opentelemetry import trace
 from pydantic import ValidationError
 
@@ -9,9 +7,9 @@ from .config import Settings, get_settings
 from .logging_config import configure_logging
 from .runner import NotPausedError
 from .storage import load_tickets
-from .telemetry import CONSOLE_ONLY, configure_telemetry
+from .telemetry import configure_telemetry, get_loggers
 
-logger = logging.getLogger(__name__)
+logger, safe_log = get_loggers(__name__)
 # A no-op tracer while telemetry is off; becomes real once a provider is set.
 tracer = trace.get_tracer(__name__)
 
@@ -41,19 +39,16 @@ def handle_run(args: RunArgs, settings: Settings) -> int:
         tickets = load_tickets(tickets_path)
     except (OSError, ValidationError) as error:
         # A validation error can quote the ticket text.
-        logger.error(
-            "Cannot load tickets from %s: %s",
-            tickets_path,
-            error,
-            extra=CONSOLE_ONLY,
-        )
+        safe_log.error("Cannot load tickets: %s", type(error).__name__)
+        logger.error("Tickets file %s: %s", tickets_path, error)
         return 2
-    logger.info("Loaded %d tickets from %s", len(tickets), tickets_path)
+    safe_log.info("Loaded %d tickets", len(tickets))
+    logger.info("Tickets file: %s", tickets_path)
 
     try:
         batch = commands.run(tickets, settings)
     except commands.MissingApiKeyError as error:
-        logger.error("%s", error)
+        safe_log.error("%s", error)
         return 2
     return 1 if batch.failed else 0
 
@@ -63,6 +58,6 @@ def handle_resume(args: ResumeArgs, settings: Settings) -> int:
     try:
         commands.resume(args.ticket_id, args.answer, settings)
     except NotPausedError as error:
-        logger.error("%s", error)
+        safe_log.error("%s", error)
         return 2
     return 0

@@ -1,13 +1,11 @@
 """Run tickets through the workflow: one thread per ticket, every run streamed."""
 
-import logging
 from dataclasses import dataclass, field
 
 from anthropic import APIError
 from langgraph.graph import END
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
-from opentelemetry.trace import Status, StatusCode
 
 from .checkpoint import run_status, thread_config
 from .models import (
@@ -21,8 +19,9 @@ from .models import (
 )
 from .nodes import TriageError
 from .telemetry import (
-    CONSOLE_ONLY,
+    get_loggers,
     record_classification,
+    record_failure,
     record_pause,
     record_reused,
     record_status,
@@ -30,7 +29,7 @@ from .telemetry import (
 )
 from .trace import trace_event
 
-logger = logging.getLogger(__name__)
+logger, safe_log = get_loggers(__name__)
 
 
 @dataclass
@@ -48,22 +47,21 @@ def run_all(tickets: list[Ticket], *, workflow: CompiledStateGraph) -> BatchResu
     """Run every ticket; a failing ticket is recorded and skipped."""
     batch = BatchResult()
     for ticket in tickets:
-        with ticket_span(ticket.id, "run") as span:
+        with ticket_span(ticket.id, "run"):
             try:
                 result = run_ticket(workflow, ticket)
             except (APIError, TriageError) as error:
                 batch.failed.append(ticket.id)
-                logger.error("Ticket %s failed: %s", ticket.id, error)
-                record_status("failed")
-                span.record_exception(error)
-                span.set_status(Status(StatusCode.ERROR, str(error)))
+                safe_log.error("Ticket %s failed: %s", ticket.id, type(error).__name__)
+                logger.error("Ticket %s error detail: %s", ticket.id, error)
+                record_failure(error)
                 continue
 
             if result is None:
                 batch.paused.append(ticket.id)
                 continue
             classification = result["classification"]
-            logger.info("Ticket %s done, result=%s", ticket.id, classification)
+            safe_log.info("Ticket %s done, result=%s", ticket.id, classification)
             batch.classified.append(to_classified_ticket(result))
     return batch
 
@@ -81,18 +79,20 @@ def run_ticket(workflow: CompiledStateGraph, ticket: Ticket) -> TriageState | No
     match run_status(saved):
         case "paused":
             record_reused("paused")
-            logger.info("Ticket %s is still waiting for a human answer", ticket.id)
+            safe_log.info("Ticket %s is still waiting for a human answer", ticket.id)
             return None
         case "unfinished":
             # None as input continues the saved run; a state would start a new one.
-            logger.info("Continuing unfinished run of ticket %s", ticket.id)
+            safe_log.info("Continuing unfinished run of ticket %s", ticket.id)
             return run_thread(workflow, None, ticket.id)
         case "finished":
             record_reused("finished")
-            logger.info("Ticket %s already finished, using the saved result", ticket.id)
+            safe_log.info(
+                "Ticket %s already finished, using the saved result", ticket.id
+            )
             return saved.values
         case "new":
-            logger.info("Starting run of ticket %s", ticket.id)
+            safe_log.info("Starting run of ticket %s", ticket.id)
             return run_thread(workflow, TriageState(ticket=ticket), ticket.id)
 
 
@@ -108,7 +108,8 @@ def resume_ticket(
     if run_status(saved) != "paused":
         raise NotPausedError(f"Ticket {ticket_id} has no paused run")
 
-    logger.info("Resuming ticket %s with %r", ticket_id, answer, extra=CONSOLE_ONLY)
+    safe_log.info("Resuming ticket %s", ticket_id)
+    logger.info("Ticket %s resume answer: %r", ticket_id, answer)
 
     return run_thread(workflow, Command(resume=answer), ticket_id)
 
@@ -145,9 +146,8 @@ def run_thread(
 
     if state.interrupts:
         requests = [item.value for item in state.interrupts]
-        logger.info(
-            "Ticket %s needs a human: %s", ticket_id, requests, extra=CONSOLE_ONLY
-        )
+        safe_log.info("Ticket %s needs a human at %s", ticket_id, state.next[0])
+        logger.info("Ticket %s review request: %s", ticket_id, requests)
         trace_event(ticket_id, state.next[0], "paused", {"requests": requests})
         record_pause(state.next[0])
         return None

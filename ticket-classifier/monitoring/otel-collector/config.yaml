@@ -18,6 +18,18 @@ processors:
     check_interval: 1s
     limit_mib: 512
     spike_limit_mib: 128
+  # Error text can quote tickets or model output. No instrumentation may store it.
+  # propagate: if this fails, the batch is dropped instead of sent unscrubbed.
+  transform/no_error_text:
+    error_mode: propagate
+    trace_statements:
+      - context: spanevent
+        statements:
+          - delete_key(spanevent.attributes, "exception.message")
+          - delete_key(spanevent.attributes, "exception.stacktrace")
+      - context: span
+        statements:
+          - set(span.status.message, "")
   # Last before the exporters: sends data in batches.
   batch: {}
 
@@ -119,7 +131,7 @@ service:
       exporters: [otlp_http/prometheus, debug]
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, transform/no_error_text, batch]
       exporters: [otlp_grpc/tempo, signal_to_metrics, debug]
     metrics/from_spans:
       receivers: [signal_to_metrics]
