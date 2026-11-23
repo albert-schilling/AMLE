@@ -1,0 +1,124 @@
+# W09 D1 - Knowledge base plan
+
+Give triage a searchable policy knowledge base, stored in PostgreSQL with pgvector.
+
+```text
+make kb-index:  data/knowledge_base/*.md → chunks → fastembed → PostgreSQL
+
+make run:       get_customer → retrieve_knowledge → triage → review or done
+                                     │                ▲
+                 ticket text → query embedding        │
+                                     │                │
+                               PostgreSQL ──── top k passages
+```
+
+## Decisions
+
+| Topic | Choice | Why |
+| --- | --- | --- |
+| Database | `pgvector/pgvector:0.8.7-pg18-trixie` | PostgreSQL 18 with the `vector` extension |
+| Python driver | `psycopg[binary]` 3.3 and `pgvector` 0.5 | Binary build and `register_vector` work on Python 3.14 |
+| Embeddings | `fastembed` 0.9, `BAAI/bge-small-en-v1.5` | Local, no PyTorch, 384 dimensions |
+| Column type | `vector(384)` | Simple, and has cosine distance (`<=>`) |
+| Search | Exact, no index at first | About 50 rows; exact search has perfect recall |
+| Checkpoints | Stay in SQLite | Moving them is a separate change |
+| Knowledge base | `data/knowledge_base/` | The app stays self-contained |
+
+The exercise text asks for SQLite BLOBs and no graph change. The user story takes
+priority: PostgreSQL, and connected to the bot.
+
+Facts to respect:
+
+- Mount the PostgreSQL 18 volume at `/var/lib/postgresql`, not `.../data`. The old path
+  can lose data when the container is recreated.
+- Publish PostgreSQL on the host as `127.0.0.1:5432:5432` only.
+- fastembed's default model cache is in the temp directory. Set a persistent `cache_dir`.
+- `make run` must not download anything: load the model with `local_files_only=True`.
+  Only `make kb-index` may download it.
+- Set `HF_HUB_DISABLE_TELEMETRY=1` before any model download.
+- New state types must join `CHECKPOINT_TYPES`, or they will not load back on resume.
+- Only ids, counts, source names and scores go to `safe_log`. Never ticket text, queries
+  or passages.
+
+## Phase A: PostgreSQL
+
+1. [x] `database/docker-compose.yml`: pinned image, port on `127.0.0.1:5432`, named
+   volume, health check with `pg_isready`. Credentials in a git-ignored `database/.env`,
+   with a `.env.example`.
+2. [ ] `make db-up`, `make db-down`, `make db-check`. Check that `CREATE EXTENSION
+   vector` works and that data survives a container restart.
+3. [ ] Add dependencies with upper bounds: `fastembed>=0.9,<0.10`, `numpy>=1.26,<3`,
+   `psycopg[binary]>=3.3,<4`, `pgvector>=0.5,<0.6`.
+4. [ ] Settings: `KNOWLEDGE_DATABASE_URL` (secret), model name, model cache path, chunk
+   size, overlap, `k`. Update `.env.example`; the user adds the URL to `.env`.
+
+## Phase B: Chunks and embeddings
+
+5. [x] The five policy files are in `data/knowledge_base/`.
+6. [ ] `knowledge/chunking.py`: `chunk_document(text, size, overlap)` makes word windows,
+   keeps the short tail and rejects `overlap >= size`. `chunk_corpus(docs)` adds `source`
+   and `ordinal`. Tests.
+7. [ ] `knowledge/embedder.py`: `fastembed_embedder()` with the import inside. It uses
+   `passage_embed` for chunks and `query_embed` for queries. Everything else depends on
+   a small `Embedder` protocol, so tests use a fake.
+
+## Phase C: Store and search
+
+8. [ ] Schema, created idempotently:
+   - `knowledge_indexes`: `model`, `chunk_size`, `chunk_overlap`, `corpus_hash`, unique
+     on the first three.
+   - `knowledge_chunks`: `index_id`, `source`, `ordinal`, `text`, `embedding vector(384)`.
+9. [ ] `KnowledgeBase.build(docs)`: skip if `corpus_hash` is unchanged, otherwise replace
+   that index's chunks in one transaction. This avoids embedding on every start.
+10. [ ] `KnowledgeBase.search(query, k)`: rank by `embedding <=> query`, return `source`,
+    `ordinal`, `text` and `score = 1 - distance`. An empty store returns `[]`. Refuse an
+    index built with a different model.
+11. [ ] CLI `ticket-classifier kb-index` and `make kb-index`. It reports chunk count and
+    whether it reused the index.
+12. [ ] Tests against a separate `knowledge_test` database, run by `make test-db` and
+    skipped by `make test`. One real fastembed test, skipped by default.
+
+## Phase D: Connect to the bot
+
+13. [ ] `KnowledgePassage` in `models/`, `knowledge` key in `TriageState` (`NotRequired`),
+    and the type in `CHECKPOINT_TYPES`.
+14. [ ] Node `retrieve_knowledge` between `get_customer` and `triage`, using the ticket
+    text as the query. Saved threads without the key must still run and resume.
+15. [ ] `create_prompt`: add passages in `<policy source="...">` tags. Update the system
+    prompt: policies inform the classification, ticket text stays untrusted.
+16. [ ] Show the passage sources to the human reviewer in the pause request.
+17. [ ] Before the first ticket, fail with a clear message if the database is down or
+    the index is missing, so no API money is spent.
+18. [ ] Telemetry: span attributes and a `safe_log` line with passage count, top score
+    and source names. Test that no passage or query text is exported.
+19. [ ] One real end-to-end check with `make run`. **Costs money: ask first.**
+
+## Phase E: Experiments (no API cost)
+
+20. [ ] Small labelled question set: refund, shipping, warranty with no shared keywords,
+    and one question the corpus cannot answer.
+21. [ ] Compare chunk sizes 30, 60 and 120 with overlaps 0, 10 and 20: hit rate at 1 and
+    3, mean reciprocal rank, chunk count. Pick the default from the results.
+22. [ ] Compare the top score of real hits and the out-of-corpus question. Set a minimum
+    score, so weak passages do not reach the prompt.
+23. [ ] Data types: compare `vector`, `halfvec`, `bytea` and `real[]` on size, operators,
+    index support and ease of use. Check pgvector's scores against a numpy cosine.
+
+## Phase F: Far-reaching goals
+
+24. [ ] PostgreSQL full-text search: generated `tsvector` column, GIN index,
+    `websearch_to_tsquery`, `ts_rank_cd`. Compare with vector search on the question set.
+25. [ ] Optional: hybrid search with reciprocal rank fusion, only if step 24 shows
+    queries that vector search misses.
+26. [ ] Optional: time exact search on a larger synthetic corpus and compare with HNSW
+    (`vector_cosine_ops`).
+27. [ ] Update `README.md` and `docs/conventions.md`.
+
+## Docs
+
+- [pgvector](https://github.com/pgvector/pgvector)
+- [pgvector-python](https://github.com/pgvector/pgvector-python)
+- [psycopg 3 installation](https://www.psycopg.org/psycopg3/docs/basic/install.html)
+- [FastEmbed](https://qdrant.github.io/fastembed/)
+- [PostgreSQL Docker image](https://hub.docker.com/_/postgres)
+- [PostgreSQL 18 text search](https://www.postgresql.org/docs/18/textsearch-controls.html)

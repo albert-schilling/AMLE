@@ -1,0 +1,32 @@
+# Local PostgreSQL with pgvector for the knowledge base.
+# The host port listens on 127.0.0.1 only. Data lives in a named volume and survives
+# restarts; `docker compose down -v` deletes it.
+
+name: ticket-classifier-database
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg18-trixie
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ticket_classifier}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in database/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-knowledge}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # PostgreSQL 18 images keep their data below this path, not in .../data.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # TCP on purpose: during first setup the temporary server only has a Unix socket,
+      # so this stays unhealthy until the real server is up.
+      test:
+        - CMD-SHELL
+        - pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
