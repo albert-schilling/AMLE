@@ -24,6 +24,21 @@ def test_searches_with_the_ticket_text_and_top_k(knowledge, make_ticket, monkeyp
     assert knowledge.queries == [("Where is my refund?", 2)]
 
 
+def test_leaves_out_passages_below_the_minimum_score(
+    knowledge, make_ticket, monkeypatch
+):
+    monkeypatch.setenv("KNOWLEDGE_MIN_SCORE", "0.6")
+    weak = REFUND_PASSAGE.model_copy(update={"ordinal": 2, "score": 0.59})
+    edge = REFUND_PASSAGE.model_copy(update={"ordinal": 3, "score": 0.6})
+    knowledge.passages = [REFUND_PASSAGE, edge, weak]
+
+    update = node_retrieve_knowledge(
+        {"ticket": make_ticket()}, Runtime(context=WorkflowContext(knowledge=knowledge))
+    )
+
+    assert update == {"knowledge": [REFUND_PASSAGE, edge]}
+
+
 def test_without_context_names_the_problem(make_ticket):
     with pytest.raises(MissingContextError):
         node_retrieve_knowledge({"ticket": make_ticket()}, Runtime(context=None))

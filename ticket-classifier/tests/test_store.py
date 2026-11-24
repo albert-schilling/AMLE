@@ -196,6 +196,22 @@ def test_search_ranks_the_matching_chunk_first(knowledge_db):
 
 
 @postgres
+def test_search_scores_are_the_cosine_similarity(knowledge_db):
+    embedder = KeywordEmbedder()
+    knowledge = knowledge_base(knowledge_db, embedder, chunk_size=10, chunk_overlap=0)
+    knowledge.build(SEARCH_DOCS)
+    query = "refund for shipping"
+
+    hits = knowledge.search(query, k=3)
+
+    q = embedder.embed_query(query)
+    for hit in hits:
+        c = embedder.vector(hit.text)
+        cosine = q @ c / (np.linalg.norm(q) * np.linalg.norm(c))
+        assert hit.score == pytest.approx(cosine, abs=1e-6)
+
+
+@postgres
 def test_search_returns_at_most_k_passages(knowledge_db):
     knowledge = knowledge_base(knowledge_db, chunk_size=10, chunk_overlap=0)
     knowledge.build(SEARCH_DOCS)

@@ -121,10 +121,44 @@ Facts to respect:
     - With 14 chunks, three passages cover a fifth of the corpus, so 120 wins partly
       by finding the right document, not the right passage.
     - Default: 60/20. Same hit@1 as the larger settings, half the prompt text of 120.
-22. [ ] Compare the top score of real hits and the out-of-corpus question. Set a minimum
+22. [x] Compare the top score of real hits and the out-of-corpus question. Set a minimum
     score, so weak passages do not reach the prompt.
-23. [ ] Data types: compare `vector`, `halfvec`, `bytea` and `real[]` on size, operators,
+
+    On 60/20 (cosine similarity):
+
+    | What | Scores |
+    | --- | --- |
+    | Answering passage, 13 of 14 questions | 0.54 to 0.76 |
+    | Top passage, unanswerable questions | 0.55 (Berlin store), 0.60 (gift wrapping) |
+    | Top passage, the 8 fixture tickets | 0.62 to 0.77 |
+
+    - The ranges overlap: the gift wrapping question scores as high as the spilled coffee
+      question. No threshold separates them, so a high one would drop real answers.
+    - `KNOWLEDGE_MIN_SCORE=0.5` is a safety floor only. It drops clearly unrelated
+      passages and keeps every real answer seen.
+    - The real guard is the prompt: policies "can be unrelated to the ticket".
+23. [x] Data types: compare `vector`, `halfvec`, `bytea` and `real[]` on size, operators,
     index support and ease of use. Check pgvector's scores against a numpy cosine.
+
+    Measured on the 29 chunks of 60/20 and the 16 questions, in temporary tables:
+
+    | Type | Bytes per value | Distance in SQL | Index (HNSW, IVFFlat) | Score vs numpy | Top 3 vs numpy |
+    | --- | ---: | --- | --- | ---: | --- |
+    | `vector(384)` | 1540 | `<->` `<#>` `<=>` `<+>` | up to 2000 dims | 2e-7 | same |
+    | `halfvec(384)` | 776 | same as `vector` | up to 4000 dims | 5e-5 | same |
+    | `real[]` | 1556 | only with a cast to `vector` | expression index on the cast | 2e-7 | same |
+    | `bytea` (float32) | 1536 | none: score in Python | none | 1e-7 | same |
+    | `bit(384)`, `binary_quantize` | 53 | `<~>` Hamming, `<%>` Jaccard | up to 64000 dims | - | differs 16 of 16 |
+
+    - `vector` stays: exact, native cosine, indexable, and `register_vector` handles it.
+    - `halfvec` halves the size with no change in ranking here. Worth it for a large
+      corpus, or as a half-precision expression index on the `vector` column.
+    - `real[]` and `bytea` work only by casting or by loading every row into Python: no
+      operator, no index. `bytea` is what the exercise's SQLite BLOB would be.
+    - `bit` alone ranks badly at 384 dimensions. pgvector's docs use it only as a first
+      pass, re-ranked with `<=>` on the full vectors.
+    - Test: `test_search_scores_are_the_cosine_similarity` checks `1 - <=>` against a
+      numpy cosine.
 
 ## Phase F: Far-reaching goals
 
