@@ -1,7 +1,9 @@
 import json
+import os
 
+import psycopg
 import pytest
-from helpers import LOW
+from helpers import LOW, FakeKnowledge
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -9,6 +11,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from ticket_classifier import customers
 from ticket_classifier.config import get_settings
+from ticket_classifier.context import WorkflowContext
 from ticket_classifier.models import Ticket
 
 CUSTOMERS = {
@@ -74,8 +77,24 @@ def write_tickets(tmp_path):
 
 
 @pytest.fixture
-def model(mocker, customers_file):
+def knowledge(mocker):
+    """A fake knowledge base, also used by the commands instead of PostgreSQL."""
+    fake = FakeKnowledge()
+    opened = mocker.patch("ticket_classifier.commands.open_knowledge_base")
+    opened.return_value.__enter__.return_value = fake
+    return fake
+
+
+@pytest.fixture
+def workflow_context(knowledge):
+    return WorkflowContext(knowledge=knowledge)
+
+
+@pytest.fixture
+def model(mocker, customers_file, knowledge):
     """Mock the triage call; returns the mocked ``parse`` to count calls.
+
+    Every graph run needs the knowledge base too, so this brings the fake one.
 
     The ticket text picks the outcome via ``model.outcomes[text]``, default ``LOW``.
     An outcome is a classification, None (no parsed output) or an exception.
@@ -111,3 +130,17 @@ def finished_spans():
     SPAN_EXPORTER.clear()
     yield SPAN_EXPORTER.get_finished_spans
     SPAN_EXPORTER.clear()
+
+
+@pytest.fixture
+def knowledge_db():
+    """A connection to the test database. Everything is rolled back afterwards.
+
+    Skips unless KNOWLEDGE_TEST_DATABASE_URL is set, see ``make test-db``.
+    """
+    url = os.environ.get("KNOWLEDGE_TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("needs KNOWLEDGE_TEST_DATABASE_URL, run make test-db")
+    with psycopg.connect(url) as connection:
+        yield connection
+        connection.rollback()

@@ -8,6 +8,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
 from .checkpoint import run_status, thread_config
+from .context import WorkflowContext
 from .models import (
     ClassifiedTicket,
     Escalated,
@@ -43,13 +44,15 @@ class NotPausedError(LookupError):
     """There is no paused run for this ticket id."""
 
 
-def run_all(tickets: list[Ticket], *, workflow: CompiledStateGraph) -> BatchResult:
+def run_all(
+    tickets: list[Ticket], *, workflow: CompiledStateGraph, context: WorkflowContext
+) -> BatchResult:
     """Run every ticket; a failing ticket is recorded and skipped."""
     batch = BatchResult()
     for ticket in tickets:
         with ticket_span(ticket.id, "run"):
             try:
-                result = run_ticket(workflow, ticket)
+                result = run_ticket(workflow, context, ticket)
             except (APIError, TriageError) as error:
                 batch.failed.append(ticket.id)
                 safe_log.error("Ticket %s failed: %s", ticket.id, type(error).__name__)
@@ -66,7 +69,9 @@ def run_all(tickets: list[Ticket], *, workflow: CompiledStateGraph) -> BatchResu
     return batch
 
 
-def run_ticket(workflow: CompiledStateGraph, ticket: Ticket) -> TriageState | None:
+def run_ticket(
+    workflow: CompiledStateGraph, context: WorkflowContext, ticket: Ticket
+) -> TriageState | None:
     """Run one ticket and return its final state; None while it waits for a human.
 
     A paused run stays paused until ``resume_ticket`` answers it, an unfinished run
@@ -84,7 +89,7 @@ def run_ticket(workflow: CompiledStateGraph, ticket: Ticket) -> TriageState | No
         case "unfinished":
             # None as input continues the saved run; a state would start a new one.
             safe_log.info("Continuing unfinished run of ticket %s", ticket.id)
-            return run_thread(workflow, None, ticket.id)
+            return run_thread(workflow, None, ticket.id, context)
         case "finished":
             record_reused("finished")
             safe_log.info(
@@ -93,7 +98,7 @@ def run_ticket(workflow: CompiledStateGraph, ticket: Ticket) -> TriageState | No
             return saved.values
         case "new":
             safe_log.info("Starting run of ticket %s", ticket.id)
-            return run_thread(workflow, TriageState(ticket=ticket), ticket.id)
+            return run_thread(workflow, TriageState(ticket=ticket), ticket.id, context)
 
 
 def resume_ticket(
@@ -111,13 +116,15 @@ def resume_ticket(
     safe_log.info("Resuming ticket %s", ticket_id)
     logger.info("Ticket %s resume answer: %r", ticket_id, answer)
 
-    return run_thread(workflow, Command(resume=answer), ticket_id)
+    # No context: a paused run waits at human_review, past retrieve_knowledge.
+    return run_thread(workflow, Command(resume=answer), ticket_id, context=None)
 
 
 def run_thread(
     workflow: CompiledStateGraph,
     run_input: TriageState | Command | None,
     ticket_id: str,
+    context: WorkflowContext | None,
 ) -> TriageState | None:
     """Every run goes through here: stream it, log and trace each node update.
 
@@ -128,7 +135,11 @@ def run_thread(
     # can continue. "custom" carries events that nodes emit while they work.
 
     stream = workflow.stream(
-        run_input, config, stream_mode=["updates", "custom"], durability="sync"
+        run_input,
+        config,
+        context=context,
+        stream_mode=["updates", "custom"],
+        durability="sync",
     )
 
     for mode, data in stream:

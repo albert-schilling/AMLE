@@ -8,7 +8,7 @@ from ticket_classifier.checkpoint import (
     run_status,
     thread_config,
 )
-from ticket_classifier.models import Ticket, TicketClassification
+from ticket_classifier.models import KnowledgePassage, Ticket, TicketClassification
 
 
 def test_open_checkpointer_creates_the_file(tmp_path):
@@ -47,3 +47,14 @@ def test_escalation_request_with_models_survives_the_serializer():
     assert (
         CHECKPOINT_SERDE.loads_typed(CHECKPOINT_SERDE.dumps_typed(request)) == request
     )
+
+
+def test_knowledge_passages_survive_the_serializer():
+    state = {
+        "ticket": Ticket(id="T-1", text="x"),
+        "knowledge": [
+            KnowledgePassage(source="refunds.md", ordinal=1, text="5 days", score=0.9)
+        ],
+    }
+
+    assert CHECKPOINT_SERDE.loads_typed(CHECKPOINT_SERDE.dumps_typed(state)) == state

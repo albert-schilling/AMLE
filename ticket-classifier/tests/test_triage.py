@@ -29,10 +29,14 @@ def test_no_parsed_output_raises(model, make_ticket):
         node_triage({"ticket": make_ticket(id="T-1"), "customer": None})
 
 
-def test_custom_event_arrives_before_the_node_update(model, mocker, make_ticket):
+def test_custom_event_arrives_before_the_node_update(
+    model, mocker, make_ticket, workflow_context
+):
     chunks = list(
         build_workflow().stream(
-            {"ticket": make_ticket(id="T-1")}, stream_mode=["updates", "custom"]
+            {"ticket": make_ticket(id="T-1")},
+            context=workflow_context,
+            stream_mode=["updates", "custom"],
         )
     )
 

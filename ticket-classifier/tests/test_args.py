@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from ticket_classifier.args import ResumeArgs, RunArgs, parse_args
+from ticket_classifier.args import KbIndexArgs, ResumeArgs, RunArgs, parse_args
 
 
 def test_run_with_tickets_file():
@@ -22,6 +22,10 @@ def test_resume_builds_the_answer(flag, approved):
     )
 
 
+def test_kb_index():
+    assert parse_args(["kb-index"]) == KbIndexArgs()
+
+
 def test_resume_note_defaults_to_empty():
     assert parse_args(["resume", "T-1", "--approve"]).answer["note"] == ""
 
@@ -33,6 +37,7 @@ def test_resume_note_defaults_to_empty():
         ["resume", "T-1"],  # no decision
         ["resume", "T-1", "--approve", "--decline"],
         ["run", "--approve"],
+        ["kb-index", "extra"],
     ],
 )
 def test_invalid_arguments_exit(argv):

@@ -1,8 +1,8 @@
 from functools import cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +32,26 @@ class Settings(BaseSettings):
     otel_resource_attributes: str = (
         "service.namespace=amle,deployment.environment.name=local"
     )
+
+    # Knowledge base: policy documents, embedded locally, stored in PostgreSQL.
+    # postgresql://user:password@localhost:5432/knowledge, see database/.env.
+    # Needed only for the knowledge base.
+    knowledge_database_url: SecretStr | None = None
+    knowledge_base_path: Path = Path("data/knowledge_base")  # one .md file per policy
+
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    # Not fastembed's default (the temp dir), so the model is downloaded only once.
+    embedding_cache_path: Path = Path("output/fastembed")
+    chunk_size: int = Field(default=60, gt=0)  # words per chunk
+    chunk_overlap: int = Field(default=10, ge=0)  # words shared by neighbouring chunks
+    knowledge_top_k: int = Field(default=3, gt=0)  # passages per ticket
+
+    @model_validator(mode="after")
+    def overlap_smaller_than_chunk(self) -> Self:
+        """Each chunk must start after the previous one, or chunking never ends."""
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError("chunk_overlap must be smaller than chunk_size")
+        return self
 
 
 @cache

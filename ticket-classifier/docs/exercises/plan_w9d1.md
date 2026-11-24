@@ -45,44 +45,44 @@ Facts to respect:
 1. [x] `database/docker-compose.yml`: pinned image, port on `127.0.0.1:5432`, named
    volume, health check with `pg_isready`. Credentials in a git-ignored `database/.env`,
    with a `.env.example`.
-2. [ ] `make db-up`, `make db-down`, `make db-check`. Check that `CREATE EXTENSION
+2. [x] `make db-up`, `make db-down`, `make db-check`. Check that `CREATE EXTENSION
    vector` works and that data survives a container restart.
-3. [ ] Add dependencies with upper bounds: `fastembed>=0.9,<0.10`, `numpy>=1.26,<3`,
+3. [x] Add dependencies with upper bounds: `fastembed>=0.9,<0.10`, `numpy>=1.26,<3`,
    `psycopg[binary]>=3.3,<4`, `pgvector>=0.5,<0.6`.
-4. [ ] Settings: `KNOWLEDGE_DATABASE_URL` (secret), model name, model cache path, chunk
+4. [x] Settings: `KNOWLEDGE_DATABASE_URL` (secret), model name, model cache path, chunk
    size, overlap, `k`. Update `.env.example`; the user adds the URL to `.env`.
 
 ## Phase B: Chunks and embeddings
 
 5. [x] The five policy files are in `data/knowledge_base/`.
-6. [ ] `knowledge/chunking.py`: `chunk_document(text, size, overlap)` makes word windows,
+6. [x] `knowledge/chunking.py`: `chunk_document(text, size, overlap)` makes word windows,
    keeps the short tail and rejects `overlap >= size`. `chunk_corpus(docs)` adds `source`
    and `ordinal`. Tests.
-7. [ ] `knowledge/embedder.py`: `fastembed_embedder()` with the import inside. It uses
+7. [x] `knowledge/embedder.py`: `fastembed_embedder()` with the import inside. It uses
    `passage_embed` for chunks and `query_embed` for queries. Everything else depends on
    a small `Embedder` protocol, so tests use a fake.
 
 ## Phase C: Store and search
 
-8. [ ] Schema, created idempotently:
+8. [x] Schema, created idempotently:
    - `knowledge_indexes`: `model`, `chunk_size`, `chunk_overlap`, `corpus_hash`, unique
      on the first three.
    - `knowledge_chunks`: `index_id`, `source`, `ordinal`, `text`, `embedding vector(384)`.
-9. [ ] `KnowledgeBase.build(docs)`: skip if `corpus_hash` is unchanged, otherwise replace
+9. [x] `KnowledgeBase.build(docs)`: skip if `corpus_hash` is unchanged, otherwise replace
    that index's chunks in one transaction. This avoids embedding on every start.
-10. [ ] `KnowledgeBase.search(query, k)`: rank by `embedding <=> query`, return `source`,
+10. [x] `KnowledgeBase.search(query, k)`: rank by `embedding <=> query`, return `source`,
     `ordinal`, `text` and `score = 1 - distance`. An empty store returns `[]`. Refuse an
     index built with a different model.
-11. [ ] CLI `ticket-classifier kb-index` and `make kb-index`. It reports chunk count and
+11. [x] CLI `ticket-classifier kb-index` and `make kb-index`. It reports chunk count and
     whether it reused the index.
-12. [ ] Tests against a separate `knowledge_test` database, run by `make test-db` and
+12. [x] Tests against a separate `knowledge_test` database, run by `make test-db` and
     skipped by `make test`. One real fastembed test, skipped by default.
 
 ## Phase D: Connect to the bot
 
-13. [ ] `KnowledgePassage` in `models/`, `knowledge` key in `TriageState` (`NotRequired`),
+13. [x] `KnowledgePassage` in `models/`, `knowledge` key in `TriageState` (`NotRequired`),
     and the type in `CHECKPOINT_TYPES`.
-14. [ ] Node `retrieve_knowledge` between `get_customer` and `triage`, using the ticket
+14. [x] Node `retrieve_knowledge` between `get_customer` and `triage`, using the ticket
     text as the query. Saved threads without the key must still run and resume.
 15. [ ] `create_prompt`: add passages in `<policy source="...">` tags. Update the system
     prompt: policies inform the classification, ticket text stays untrusted.
@@ -113,6 +113,13 @@ Facts to respect:
 26. [ ] Optional: time exact search on a larger synthetic corpus and compare with HNSW
     (`vector_cosine_ops`).
 27. [ ] Update `README.md` and `docs/conventions.md`.
+
+## Phase G: Type checks (after the user story)
+
+28. [ ] Pick a type checker for Python 3.14 (mypy, pyright or ty), from the official
+    docs. Add it to the dev dependencies and to `make lint`.
+29. [ ] Fix the errors it finds, without `Any` or `# type: ignore` where a real type
+    exists.
 
 ## Docs
 

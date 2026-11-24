@@ -38,6 +38,9 @@ Write clean code for humans: code a reader understands on the first pass.
 
 ## Types
 
+- Type everything where possible: arguments, return values, attributes. Use `Any`
+  only where no real type exists.
+- A type from a module that is imported lazily goes under `if TYPE_CHECKING:`.
 - A `TypedDict` has no defaults: mark keys that may be missing with `NotRequired`.
 - Use a `dataclass` for internal objects, pydantic for data from outside (files, model
   output), a `TypedDict` where LangGraph needs a plain dict.

@@ -11,10 +11,25 @@ from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import StateSnapshot
 
-from .models import Customer, Escalated, NotEscalated, Ticket, TicketClassification
+from .models import (
+    Customer,
+    Escalated,
+    KnowledgePassage,
+    NotEscalated,
+    Ticket,
+    TicketClassification,
+)
 
 # State types saved in checkpoints; only these (and safe built-ins) load back.
-CHECKPOINT_TYPES = [Customer, Escalated, NotEscalated, Ticket, TicketClassification]
+# A missing one does not fail: it loads back as a plain dict, with a warning.
+CHECKPOINT_TYPES = [
+    Customer,
+    Escalated,
+    KnowledgePassage,
+    NotEscalated,
+    Ticket,
+    TicketClassification,
+]
 CHECKPOINT_SERDE = JsonPlusSerializer(allowed_msgpack_modules=CHECKPOINT_TYPES)
 
 RunStatus = Literal["new", "paused", "unfinished", "finished"]

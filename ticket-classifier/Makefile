@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 # .PHONY tells Make that these targets are commands, not actual files on disk
 .PHONY: format lint setup test run approve decline reset help \
-	obs-up obs-down obs-check obs-usage
+	obs-up obs-down obs-check obs-usage db-up db-down db-check test-db test-embedding kb-index
 
 # The default target that runs if you just type 'make'
 help:
@@ -20,6 +20,12 @@ help:
 	@echo "  make obs-down  - Stop the monitoring stack (data is kept)"
 	@echo "  make obs-check - Check that all monitoring services are ready"
 	@echo "  make obs-usage - Show disk usage of the monitoring data"
+	@echo "  make db-up    - Start PostgreSQL and wait until it is healthy"
+	@echo "  make db-down  - Stop PostgreSQL (data is kept)"
+	@echo "  make db-check - Check that PostgreSQL and pgvector are ready"
+	@echo "  make test-db  - Run the tests that need PostgreSQL (database knowledge_test)"
+	@echo "  make test-embedding - Run the one test with the real embedding model"
+	@echo "  make kb-index - Embed data/knowledge_base into PostgreSQL (first run downloads the model)"
 
 setup:
 	uv sync
@@ -76,3 +82,35 @@ obs-check:
 
 obs-usage:
 	@docker system df -v | grep -E '^VOLUME NAME|^ticket-classifier-monitoring_'
+
+# Local PostgreSQL with pgvector for the knowledge base.
+DB_COMPOSE := docker compose -f database/docker-compose.yml
+DB_PSQL := $(DB_COMPOSE) exec -T postgres sh -c 'psql -At -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+db-up:
+	$(DB_COMPOSE) up -d --wait
+
+db-down:
+	$(DB_COMPOSE) down
+
+db-check:
+	@$(DB_COMPOSE) exec -T postgres sh -c 'pg_isready -q -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' \
+		&& echo "OK    postgres" || { echo "FAIL  postgres"; exit 1; }
+	@version=$$(echo "select default_version from pg_available_extensions where name = 'vector'" | $(DB_PSQL)); \
+	test -n "$$version" && echo "OK    pgvector $$version" || { echo "FAIL  pgvector"; exit 1; }
+
+# Tests that need PostgreSQL use their own database; each test is rolled back.
+test-db:
+	@echo "select 1 from pg_database where datname = 'knowledge_test'" | $(DB_PSQL) | grep -q 1 \
+		|| echo "create database knowledge_test" | $(DB_PSQL)
+	@set -a; . database/.env; set +a; \
+	KNOWLEDGE_TEST_DATABASE_URL="postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/knowledge_test" \
+		uv run pytest -m postgres
+
+# The real model, from output/fastembed (downloaded on first use).
+test-embedding:
+	RUN_EMBEDDING_TEST=1 uv run pytest tests/test_embedder.py
+
+# Local embedding model, no API cost. Skipped if the documents are unchanged.
+kb-index:
+	uv run ticket-classifier kb-index

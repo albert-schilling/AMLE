@@ -1,9 +1,12 @@
+import psycopg
 from opentelemetry import trace
 from pydantic import ValidationError
 
 from . import commands
-from .args import ResumeArgs, RunArgs, parse_args
+from .args import KbIndexArgs, ResumeArgs, RunArgs, parse_args
 from .config import Settings, get_settings
+from .knowledge.documents import NoDocumentsError
+from .knowledge.store import KnowledgeDatabaseNotConfiguredError
 from .logging_config import configure_logging
 from .runner import NotPausedError
 from .storage import load_tickets
@@ -30,6 +33,9 @@ def main(argv: list[str] | None = None) -> int:
         case ResumeArgs():
             with tracer.start_as_current_span("ticket-classifier resume"):
                 return handle_resume(args, settings)
+        case KbIndexArgs():
+            with tracer.start_as_current_span("ticket-classifier kb-index"):
+                return handle_kb_index(settings)
 
 
 def handle_run(args: RunArgs, settings: Settings) -> int:
@@ -59,5 +65,20 @@ def handle_resume(args: ResumeArgs, settings: Settings) -> int:
         commands.resume(args.ticket_id, args.answer, settings)
     except NotPausedError as error:
         safe_log.error("%s", error)
+        return 2
+    return 0
+
+
+def handle_kb_index(settings: Settings) -> int:
+    """Index the knowledge base; 2 if the documents or the database are missing."""
+    try:
+        commands.index_knowledge(settings)
+    except (NoDocumentsError, KnowledgeDatabaseNotConfiguredError) as error:
+        safe_log.error("Cannot index the knowledge base: %s", type(error).__name__)
+        logger.error("%s", error)
+        return 2
+    except psycopg.OperationalError as error:  # database down or login failed
+        safe_log.error("Cannot reach the knowledge database: %s", type(error).__name__)
+        logger.error("%s. Is it running? make db-up", error)
         return 2
     return 0

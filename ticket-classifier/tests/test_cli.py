@@ -1,7 +1,10 @@
+import psycopg
 import pytest
 
 from ticket_classifier.cli import main
 from ticket_classifier.commands import MissingApiKeyError
+from ticket_classifier.knowledge.documents import NoDocumentsError
+from ticket_classifier.knowledge.store import KnowledgeDatabaseNotConfiguredError
 from ticket_classifier.runner import BatchResult, NotPausedError
 
 
@@ -77,3 +80,29 @@ def test_run_without_api_key_returns_2(run, write_tickets):
     run.side_effect = MissingApiKeyError("ANTHROPIC_API_KEY is not set")
 
     assert main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))]) == 2
+
+
+@pytest.fixture
+def index_knowledge(mocker):
+    return mocker.patch("ticket_classifier.cli.commands.index_knowledge")
+
+
+def test_kb_index_returns_0(index_knowledge):
+    assert main(["kb-index"]) == 0
+    index_knowledge.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        NoDocumentsError("No .md files in data/knowledge_base"),
+        KnowledgeDatabaseNotConfiguredError("Set KNOWLEDGE_DATABASE_URL"),
+        psycopg.OperationalError("connection refused"),
+    ],
+)
+def test_kb_index_returns_2_when_documents_or_database_are_missing(
+    index_knowledge, error
+):
+    index_knowledge.side_effect = error
+
+    assert main(["kb-index"]) == 2

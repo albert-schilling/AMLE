@@ -5,6 +5,7 @@ from typing import Annotated, Literal, NotRequired, TypedDict
 from pydantic import BaseModel, Field
 
 from .domain import Customer, Ticket, TicketClassification
+from .knowledge import KnowledgePassage
 
 
 class NotEscalated(BaseModel):
@@ -27,6 +28,9 @@ class TriageState(TypedDict):
 
     ticket: Ticket
     customer: NotRequired[Customer | None]  # None: no id, unknown, or unreadable
+    # Policy passages for the ticket, best first. Missing in runs saved before the
+    # knowledge base existed.
+    knowledge: NotRequired[list[KnowledgePassage]]
     classification: NotRequired[TicketClassification]
     escalation: NotRequired[Escalation]
 

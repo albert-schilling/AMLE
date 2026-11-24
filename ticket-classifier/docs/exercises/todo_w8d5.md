@@ -25,6 +25,8 @@ crashes) and the safe log check are done.
 
 - [ ] Split `telemetry.py` into setup, logs and spans.
 - [ ] Move OTel out of `cli.py`, for example into a `command_span()` helper.
+- [ ] Split `commands.py` into a package: `tickets.py` (run, resume) and `knowledge.py`
+      (index_knowledge), so each command only imports what it needs.
 - [ ] Use consistent attribute names: `ticket_id` and `run_mode` vs `ticket.status` and
       `ticket.reused`. Update the collector config, dashboards and README with them.
 - [ ] Rename `trace.py`, for example to `event_log.py`, to avoid confusion with OTel

@@ -1,8 +1,12 @@
-"""What the CLI subcommands do: run the workflow over tickets, answer a paused one."""
+"""What the CLI subcommands do: run the workflow over tickets, answer a paused one,
+index the knowledge base."""
 
 from .checkpoint import open_checkpointer
 from .config import Settings
+from .context import WorkflowContext
 from .graph import build_workflow, write_mermaid
+from .knowledge.documents import load_documents
+from .knowledge.store import BuildResult, open_knowledge_base
 from .models import ClassifiedTicket, HumanAnswer, Ticket
 from .runner import BatchResult, resume_ticket, run_all, to_classified_ticket
 from .storage import merge_results, save_results
@@ -23,10 +27,14 @@ def run(tickets: list[Ticket], settings: Settings) -> BatchResult:
     if settings.anthropic_api_key is None:
         raise MissingApiKeyError("ANTHROPIC_API_KEY is not set; run needs it")
 
-    with open_checkpointer(settings.checkpoint_path) as checkpointer:
+    with (
+        open_checkpointer(settings.checkpoint_path) as checkpointer,
+        open_knowledge_base(settings) as knowledge,
+    ):
         workflow = build_workflow(checkpointer)
         write_mermaid(workflow, settings.graph_path)
-        batch = run_all(tickets, workflow=workflow)
+        context = WorkflowContext(knowledge=knowledge)
+        batch = run_all(tickets, workflow=workflow, context=context)
 
     save_results(batch.classified, settings.results_path)
     safe_log.info(
@@ -69,3 +77,26 @@ def resume(
         safe_log.info("Ticket %s done", ticket_id)
         logger.info("Results in %s", settings.results_path)
         return classified
+
+
+def index_knowledge(settings: Settings) -> BuildResult:
+    """Embed the knowledge base into PostgreSQL, unless it is unchanged.
+
+    The only command that may download the embedding model.
+    """
+    docs = load_documents(settings.knowledge_base_path)
+
+    with open_knowledge_base(settings, download=True) as knowledge:
+        result = knowledge.build(docs)
+
+    safe_log.info(
+        "Knowledge index %d (%s, size %d, overlap %d): %d chunks from %d documents, %s",
+        result.index_id,
+        settings.embedding_model,
+        settings.chunk_size,
+        settings.chunk_overlap,
+        result.chunk_count,
+        len(docs),
+        "unchanged" if result.reused else "rebuilt",
+    )
+    return result
