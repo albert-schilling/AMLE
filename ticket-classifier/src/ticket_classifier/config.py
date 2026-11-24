@@ -43,8 +43,11 @@ class Settings(BaseSettings):
     # Not fastembed's default (the temp dir), so the model is downloaded only once.
     embedding_cache_path: Path = Path("output/fastembed")
     chunk_size: int = Field(default=60, gt=0)  # words per chunk
-    chunk_overlap: int = Field(default=10, ge=0)  # words shared by neighbouring chunks
+    # Words shared by neighboring chunks. 60/20 from make kb-eval, see plan_w9d1.md.
+    chunk_overlap: int = Field(default=20, ge=0)
     knowledge_top_k: int = Field(default=3, gt=0)  # passages per ticket
+    # Labelled questions for make kb-eval; outside the knowledge base, never indexed.
+    knowledge_questions_path: Path = Path("data/eval/knowledge_questions.json")
 
     @model_validator(mode="after")
     def overlap_smaller_than_chunk(self) -> Self:

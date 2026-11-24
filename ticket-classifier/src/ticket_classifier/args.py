@@ -23,16 +23,55 @@ class KbIndexArgs:
     """No options: folder, model and chunk setting come from the settings."""
 
 
-def parse_args(argv: list[str] | None = None) -> RunArgs | ResumeArgs | KbIndexArgs:
-    namespace = build_parser().parse_args(argv)
-    if namespace.command == "run":
-        return RunArgs(tickets=namespace.tickets)
-    if namespace.command == "kb-index":
-        return KbIndexArgs()
-    return ResumeArgs(
-        ticket_id=namespace.ticket_id,
-        answer=HumanAnswer(approved=namespace.approved, note=namespace.note),
-    )
+@dataclass(frozen=True)
+class KbEvalArgs:
+    """Every size with every overlap; raises ``ValueError`` if none fits."""
+
+    sizes: list[int]
+    overlaps: list[int]
+
+    def __post_init__(self) -> None:
+        if not self.chunk_settings:
+            raise ValueError("kb-eval: no overlap is smaller than any size")
+
+    @property
+    def chunk_settings(self) -> list[tuple[int, int]]:
+        """(size, overlap) pairs; an overlap not below the size is skipped."""
+        return [
+            (size, overlap)
+            for size in self.sizes
+            for overlap in self.overlaps
+            if overlap < size
+        ]
+
+
+Args = RunArgs | ResumeArgs | KbIndexArgs | KbEvalArgs
+
+
+def parse_args(argv: list[str] | None = None) -> Args:
+    parser = build_parser()
+    namespace = parser.parse_args(argv)
+
+    try:
+        match namespace.command:
+            case "run":
+                return RunArgs(tickets=namespace.tickets)
+            case "resume":
+                return ResumeArgs(
+                    ticket_id=namespace.ticket_id,
+                    answer=HumanAnswer(
+                        approved=namespace.approved, note=namespace.note
+                    ),
+                )
+            case "kb-index":
+                return KbIndexArgs()
+            case "kb-eval":
+                return KbEvalArgs(sizes=namespace.sizes, overlaps=namespace.overlaps)
+    except ValueError as error:
+        parser.error(str(error))  # exits with code 2, like other bad arguments
+
+    # A subcommand in build_parser without a case above.
+    raise AssertionError(f"unhandled command: {namespace.command}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -76,4 +115,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="embed the knowledge base into PostgreSQL; skipped if it is unchanged",
     )
 
+    kb_eval = subcommands.add_parser(
+        "kb-eval", help="compare chunk settings on the labelled questions"
+    )
+    kb_eval.add_argument(
+        "--sizes",
+        nargs="+",
+        type=positive_int,
+        default=[30, 60, 120],
+        help="chunk sizes in words",
+    )
+    kb_eval.add_argument(
+        "--overlaps",
+        nargs="+",
+        type=non_negative_int,
+        default=[0, 10, 20],
+        help="overlaps in words; skipped where not smaller than the size",
+    )
+
     return parser
+
+
+def positive_int(text: str) -> int:
+    value = int(text)
+    if value <= 0:
+        raise argparse.ArgumentTypeError(f"must be positive: {value}")
+    return value
+
+
+def non_negative_int(text: str) -> int:
+    value = int(text)
+    if value < 0:
+        raise argparse.ArgumentTypeError(f"must not be negative: {value}")
+    return value

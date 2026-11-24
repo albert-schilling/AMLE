@@ -7,6 +7,7 @@ from helpers import HIGH
 
 from ticket_classifier import commands
 from ticket_classifier.config import get_settings
+from ticket_classifier.knowledge.store import KnowledgeIndexMissingError
 
 
 @pytest.fixture
@@ -77,4 +78,16 @@ def test_run_without_api_key_raises_before_any_work(
     with pytest.raises(commands.MissingApiKeyError):
         commands.run(tickets(make_ticket), settings)
     triage.assert_not_called()
+    assert not settings.checkpoint_path.exists()
+
+
+def test_run_without_knowledge_index_raises_before_any_work(
+    settings, triage, knowledge, make_ticket
+):
+    knowledge.index_missing = True
+
+    with pytest.raises(KnowledgeIndexMissingError):
+        commands.run(tickets(make_ticket), settings)
+    triage.assert_not_called()
+    assert knowledge.queries == []
     assert not settings.checkpoint_path.exists()

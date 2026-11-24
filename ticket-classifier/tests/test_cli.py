@@ -4,7 +4,12 @@ import pytest
 from ticket_classifier.cli import main
 from ticket_classifier.commands import MissingApiKeyError
 from ticket_classifier.knowledge.documents import NoDocumentsError
-from ticket_classifier.knowledge.store import KnowledgeDatabaseNotConfiguredError
+from ticket_classifier.knowledge.embedder import EmbeddingModelMissingError
+from ticket_classifier.knowledge.evaluation import ChunkSettingResult, SearchQuality
+from ticket_classifier.knowledge.store import (
+    KnowledgeDatabaseNotConfiguredError,
+    KnowledgeIndexMissingError,
+)
 from ticket_classifier.runner import BatchResult, NotPausedError
 
 
@@ -82,6 +87,21 @@ def test_run_without_api_key_returns_2(run, write_tickets):
     assert main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))]) == 2
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        KnowledgeDatabaseNotConfiguredError("Set KNOWLEDGE_DATABASE_URL"),
+        psycopg.OperationalError("connection refused"),
+        EmbeddingModelMissingError("Run: make kb-index"),
+        KnowledgeIndexMissingError("Run: make kb-index"),
+    ],
+)
+def test_run_returns_2_when_the_knowledge_base_is_not_ready(run, write_tickets, error):
+    run.side_effect = error
+
+    assert main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))]) == 2
+
+
 @pytest.fixture
 def index_knowledge(mocker):
     return mocker.patch("ticket_classifier.cli.commands.index_knowledge")
@@ -106,3 +126,33 @@ def test_kb_index_returns_2_when_documents_or_database_are_missing(
     index_knowledge.side_effect = error
 
     assert main(["kb-index"]) == 2
+
+
+@pytest.fixture
+def evaluate(mocker):
+    return mocker.patch("ticket_classifier.cli.commands.evaluate_chunk_settings")
+
+
+def test_kb_eval_prints_the_table(evaluate, capsys):
+    evaluate.return_value = [
+        ChunkSettingResult(30, 0, 40, SearchQuality(0.5, 0.75, 0.6))
+    ]
+
+    assert main(["kb-eval", "--sizes", "30", "--overlaps", "0"]) == 0
+    assert evaluate.call_args.args[1] == [(30, 0)]
+    assert "| 30 | 0 | 40 | 0.50 | 0.75 | 0.60 |" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        FileNotFoundError("no questions file"),
+        KnowledgeDatabaseNotConfiguredError("Set KNOWLEDGE_DATABASE_URL"),
+        EmbeddingModelMissingError("Run: make kb-index"),
+        psycopg.OperationalError("connection refused"),
+    ],
+)
+def test_kb_eval_returns_2_when_an_input_is_missing(evaluate, error):
+    evaluate.side_effect = error
+
+    assert main(["kb-eval"]) == 2

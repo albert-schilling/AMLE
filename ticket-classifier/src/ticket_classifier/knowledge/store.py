@@ -5,7 +5,6 @@ import json
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Protocol
 
 import numpy as np
 import psycopg
@@ -44,12 +43,6 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
     PRIMARY KEY (index_id, source, ordinal)
 );
 """
-
-
-class KnowledgeSearch(Protocol):
-    """What the workflow needs from the knowledge base; tests use a fake."""
-
-    def search(self, query: str, k: int) -> list[KnowledgePassage]: ...
 
 
 class KnowledgeDatabaseNotConfiguredError(RuntimeError):
@@ -169,9 +162,7 @@ class KnowledgeBase:
         """
         if k <= 0:
             raise ValueError("k must be positive")
-        index = self.find_index()
-        if index is None:
-            raise KnowledgeIndexMissingError(self.missing_index_message())
+        index_id = self.require_index()
         vector = self.embedder.embed_query(query)
         if not np.any(vector):  # no direction: cosine is undefined (NaN)
             return []
@@ -179,12 +170,19 @@ class KnowledgeBase:
             "SELECT source, ordinal, text, 1 - (embedding <=> %(query)s) AS score"
             " FROM knowledge_chunks WHERE index_id = %(index_id)s"
             " ORDER BY embedding <=> %(query)s LIMIT %(k)s",
-            {"query": vector, "index_id": index[0], "k": k},
+            {"query": vector, "index_id": index_id, "k": k},
         ).fetchall()
         return [
             KnowledgePassage(source=source, ordinal=ordinal, text=text, score=score)
             for source, ordinal, text, score in rows
         ]
+
+    def require_index(self) -> int:
+        """Id of this index; ``KnowledgeIndexMissingError`` if it was not built."""
+        index = self.find_index()
+        if index is None:
+            raise KnowledgeIndexMissingError(self.missing_index_message())
+        return index[0]
 
     def find_index(self) -> tuple[int, str] | None:
         """Id and corpus hash of this index, if it was built."""

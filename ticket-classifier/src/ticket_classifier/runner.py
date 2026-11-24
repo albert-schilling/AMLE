@@ -21,10 +21,10 @@ from .models import (
 from .nodes import TriageError
 from .telemetry import (
     get_loggers,
-    record_classification,
     record_failure,
     record_pause,
     record_reused,
+    record_state,
     record_status,
     ticket_span,
 )
@@ -79,7 +79,7 @@ def run_ticket(
     """
     saved = workflow.get_state(thread_config(ticket.id))
 
-    record_classification(saved.values)  # a paused or finished run has one already
+    record_state(saved.values)  # a paused or finished run has them already
 
     match run_status(saved):
         case "paused":
@@ -153,7 +153,7 @@ def run_thread(
 
     state = workflow.get_state(config)
 
-    record_classification(state.values)
+    record_state(state.values)
 
     if state.interrupts:
         requests = [item.value for item in state.interrupts]

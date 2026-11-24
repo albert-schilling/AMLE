@@ -231,6 +231,14 @@ def test_search_without_index_names_the_fix_and_the_built_ones(knowledge_db):
     assert "fake-keyword 10/0" in str(error.value)
 
 
+@postgres
+def test_require_index_returns_the_built_index(knowledge_db):
+    knowledge = knowledge_base(knowledge_db, chunk_size=10, chunk_overlap=0)
+    result = knowledge.build(SEARCH_DOCS)
+
+    assert knowledge.require_index() == result.index_id
+
+
 def test_search_rejects_k_below_one():
     knowledge = KnowledgeBase(None, KeywordEmbedder(), chunk_size=4, chunk_overlap=1)
 

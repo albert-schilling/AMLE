@@ -1,0 +1,18 @@
+[
+  {"id": "Q-01", "question": "Can I get my money back? I bought it three weeks ago.", "source": "refunds.md", "answer": "within 30 days"},
+  {"id": "Q-02", "question": "I sent the item back last week but the money is still not on my prepaid card.", "source": "refunds.md", "answer": "up to 10 business days"},
+  {"id": "Q-03", "question": "I already downloaded the program. Can I still return it?", "source": "refunds.md", "answer": "non-refundable once"},
+  {"id": "Q-04", "question": "How much is postage for a small order?", "source": "shipping.md", "answer": "flat 4.90"},
+  {"id": "Q-05", "question": "The tracking page shows nothing. Is my package lost?", "source": "shipping.md", "answer": "becomes active within"},
+  {"id": "Q-06", "question": "The courier says it was dropped off, but there is nothing at my door.", "source": "shipping.md", "answer": "check with neighbours"},
+  {"id": "Q-07", "question": "Do you deliver to Switzerland?", "source": "shipping.md", "answer": "do not currently ship outside the EU"},
+  {"id": "Q-08", "question": "My blender stopped working after two months. Will you fix it?", "source": "warranty.md", "answer": "two-year warranty"},
+  {"id": "Q-09", "question": "I spilled coffee on the device and now it will not turn on.", "source": "warranty.md", "answer": "liquid damage"},
+  {"id": "Q-10", "question": "A local shop tried to fix it and it is still broken. Are you still responsible?", "source": "warranty.md", "answer": "carried out by a third party"},
+  {"id": "Q-11", "question": "My bank statement shows two charges for one order.", "source": "billing.md", "answer": "temporary authorisation hold"},
+  {"id": "Q-12", "question": "If I move to a cheaper plan, when does it change?", "source": "billing.md", "answer": "Downgrades take effect at the next renewal"},
+  {"id": "Q-13", "question": "I never got the email to set a new password.", "source": "accounts.md", "answer": "check their spam folder"},
+  {"id": "Q-14", "question": "Can you combine my two accounts into one?", "source": "accounts.md", "answer": "cannot merge two separate accounts"},
+  {"id": "Q-15", "question": "What are the opening hours of your store in Berlin?", "source": null, "answer": null},
+  {"id": "Q-16", "question": "Do you offer gift wrapping?", "source": null, "answer": null}
+]

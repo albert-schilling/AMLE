@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
+from ticket_classifier.knowledge.store import KnowledgeIndexMissingError
 from ticket_classifier.models import KnowledgePassage, TicketClassification
 
 HIGH = TicketClassification(category="billing", priority="high")
@@ -49,6 +50,12 @@ class FakeKnowledge:
     def __init__(self, passages=(REFUND_PASSAGE,)):
         self.passages = list(passages)
         self.queries = []
+        self.index_missing = False
+
+    def require_index(self) -> int:
+        if self.index_missing:
+            raise KnowledgeIndexMissingError("No knowledge index. Run: make kb-index")
+        return 1
 
     def search(self, query: str, k: int) -> list[KnowledgePassage]:
         self.queries.append((query, k))

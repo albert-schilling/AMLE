@@ -16,6 +16,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from ticket_classifier.cli import main
 from ticket_classifier.client import get_client
 from ticket_classifier.config import Settings
+from ticket_classifier.models import KnowledgePassage
 from ticket_classifier.telemetry import (
     APP_LOGGER,
     EXPORT_LOG,
@@ -188,10 +189,13 @@ def test_unmarked_line_is_not_exported_but_still_logged(exported_logs, caplog):
     assert "secret text" in caplog.text
 
 
-def test_run_and_resume_export_no_ticket_or_customer_text(
-    model, write_tickets, exported_logs, monkeypatch
+def test_run_and_resume_export_no_ticket_customer_or_policy_text(
+    model, knowledge, write_tickets, exported_logs, monkeypatch
 ):
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    knowledge.passages = [
+        KnowledgePassage(source="refunds.md", ordinal=1, text="private policy", score=1)
+    ]
     model.outcomes["private ticket text"] = HIGH
     tickets = write_tickets([{"id": "T-1", "text": "private ticket text"}])
 
@@ -200,7 +204,13 @@ def test_run_and_resume_export_no_ticket_or_customer_text(
 
     bodies = " ".join(str(record.body) for record in exported_logs())
     assert "T-1" in bodies
-    for private in ("private ticket text", "private reviewer note", "alice@"):
+    assert "refunds.md#1" in bodies  # the citation is safe, the text is not
+    for private in (
+        "private ticket text",
+        "private reviewer note",
+        "private policy",
+        "alice@",
+    ):
         assert private not in bodies
 
 

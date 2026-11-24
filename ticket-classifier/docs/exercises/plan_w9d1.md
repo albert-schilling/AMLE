@@ -23,6 +23,7 @@ make run:       get_customer → retrieve_knowledge → triage → review or don
 | Search | Exact, no index at first | About 50 rows; exact search has perfect recall |
 | Checkpoints | Stay in SQLite | Moving them is a separate change |
 | Knowledge base | `data/knowledge_base/` | The app stays self-contained |
+| Chunks | 60 words, overlap 20 | See step 21 |
 
 The exercise text asks for SQLite BLOBs and no graph change. The user story takes
 priority: PostgreSQL, and connected to the bot.
@@ -87,18 +88,39 @@ Facts to respect:
 15. [x] `create_prompt`: add passages in `<policy source="...">` tags. Update the system
     prompt: policies inform the classification, ticket text stays untrusted.
 16. [x] Show the passage sources to the human reviewer in the pause request.
-17. [ ] Before the first ticket, fail with a clear message if the database is down or
+17. [x] Before the first ticket, fail with a clear message if the database is down or
     the index is missing, so no API money is spent.
-18. [ ] Telemetry: span attributes and a `safe_log` line with passage count, top score
+18. [x] Telemetry: span attributes and a `safe_log` line with passage count, top score
     and source names. Test that no passage or query text is exported.
 19. [ ] One real end-to-end check with `make run`. **Costs money: ask first.**
 
 ## Phase E: Experiments (no API cost)
 
-20. [ ] Small labelled question set: refund, shipping, warranty with no shared keywords,
+20. [x] Small labelled question set: refund, shipping, warranty with no shared keywords,
     and one question the corpus cannot answer.
-21. [ ] Compare chunk sizes 30, 60 and 120 with overlaps 0, 10 and 20: hit rate at 1 and
+21. [x] Compare chunk sizes 30, 60 and 120 with overlaps 0, 10 and 20: hit rate at 1 and
     3, mean reciprocal rank, chunk count. Pick the default from the results.
+
+    `make kb-eval`, 14 answerable questions (one question is 0.07):
+
+    | Size | Overlap | Chunks | Hit@1 | Hit@3 | MRR |
+    | ---: | ---: | ---: | ---: | ---: | ---: |
+    | 120 | 20 | 14 | 0.79 | 1.00 | 0.89 |
+    | 90 | 20 | 17 | 0.79 | 0.93 | 0.86 |
+    | 80 | 10 | 19 | 0.79 | 0.93 | 0.85 |
+    | 60 | 20 | 29 | 0.79 | 0.93 | 0.83 |
+    | 60 | 10 | 25 | 0.71 | 0.79 | 0.74 |
+    | 60 | 0 | 21 | 0.50 | 0.93 | 0.69 |
+    | 30 | 20 | 108 | 0.57 | 0.57 | 0.57 |
+    | 30 | 0 | 41 | 0.43 | 0.64 | 0.52 |
+
+    - 30 words is too small: little meaning per chunk, and answers are cut at edges.
+    - Overlap helps: 60/20 beats 60/10.
+    - From 60/20 to 120/20 the results differ by one or two questions, and they go up
+      and down with the overlap: noise. Telling them apart needs more questions.
+    - With 14 chunks, three passages cover a fifth of the corpus, so 120 wins partly
+      by finding the right document, not the right passage.
+    - Default: 60/20. Same hit@1 as the larger settings, half the prompt text of 120.
 22. [ ] Compare the top score of real hits and the out-of-corpus question. Set a minimum
     score, so weak passages do not reach the prompt.
 23. [ ] Data types: compare `vector`, `halfvec`, `bytea` and `real[]` on size, operators,

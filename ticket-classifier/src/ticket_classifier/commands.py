@@ -1,11 +1,18 @@
 """What the CLI subcommands do: run the workflow over tickets, answer a paused one,
-index the knowledge base."""
+index the knowledge base, compare chunk settings."""
+
+from collections.abc import Sequence
 
 from .checkpoint import open_checkpointer
 from .config import Settings
 from .context import WorkflowContext
 from .graph import build_workflow, write_mermaid
 from .knowledge.documents import load_documents
+from .knowledge.evaluation import (
+    ChunkSettingResult,
+    compare_chunk_settings,
+    load_questions,
+)
 from .knowledge.store import BuildResult, open_knowledge_base
 from .models import ClassifiedTicket, HumanAnswer, Ticket
 from .runner import BatchResult, resume_ticket, run_all, to_classified_ticket
@@ -22,19 +29,23 @@ class MissingApiKeyError(RuntimeError):
 def run(tickets: list[Ticket], settings: Settings) -> BatchResult:
     """Classify all tickets and save the results; high-priority ones stay paused.
 
-    Raises ``MissingApiKeyError`` before any work if the API key is not set.
+    Fails before the first ticket, so no API call is made, if the API key is not set
+    (``MissingApiKeyError``) or the knowledge base is not ready: database not set or
+    down, model not downloaded, index not built.
     """
     if settings.anthropic_api_key is None:
         raise MissingApiKeyError("ANTHROPIC_API_KEY is not set; run needs it")
 
-    with (
-        open_checkpointer(settings.checkpoint_path) as checkpointer,
-        open_knowledge_base(settings) as knowledge,
-    ):
-        workflow = build_workflow(checkpointer)
-        write_mermaid(workflow, settings.graph_path)
-        context = WorkflowContext(knowledge=knowledge)
-        batch = run_all(tickets, workflow=workflow, context=context)
+    with open_knowledge_base(settings) as knowledge:
+        knowledge.require_index()
+
+        with open_checkpointer(settings.checkpoint_path) as checkpointer:
+            workflow = build_workflow(checkpointer)
+            write_mermaid(workflow, settings.graph_path)
+
+            context = WorkflowContext(knowledge=knowledge)
+
+            batch = run_all(tickets, workflow=workflow, context=context)
 
     save_results(batch.classified, settings.results_path)
     safe_log.info(
@@ -100,3 +111,31 @@ def index_knowledge(settings: Settings) -> BuildResult:
         "unchanged" if result.reused else "rebuilt",
     )
     return result
+
+
+def evaluate_chunk_settings(
+    settings: Settings, chunk_settings: Sequence[tuple[int, int]]
+) -> list[ChunkSettingResult]:
+    """Search the labelled questions with an index per (size, overlap).
+
+    Builds missing indexes with the local model; changes nothing for ``run``, which
+    keeps using the chunk setting from the settings.
+    """
+    docs = load_documents(settings.knowledge_base_path)
+    questions = load_questions(settings.knowledge_questions_path)
+
+    with open_knowledge_base(settings) as knowledge:
+        results = compare_chunk_settings(knowledge, docs, questions, chunk_settings)
+
+    for result in results:
+        quality = result.quality
+        safe_log.info(
+            "Chunk size %d, overlap %d: %d chunks, hit@1 %.2f, hit@3 %.2f, MRR %.2f",
+            result.chunk_size,
+            result.chunk_overlap,
+            result.chunk_count,
+            quality.hit_at_1,
+            quality.hit_at_3,
+            quality.mean_reciprocal_rank,
+        )
+    return results

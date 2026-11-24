@@ -1,7 +1,7 @@
 """Data only: what comes in, what the graph carries, what comes out."""
 
 from .domain import Category, Customer, Priority, Product, Ticket, TicketClassification
-from .knowledge import Chunk, KnowledgePassage
+from .knowledge import Chunk, EvalQuestion, KnowledgePassage
 from .results import ClassifiedTicket, EscalatedTicket, ResolvedTicket, TicketResult
 from .state import (
     Escalated,
@@ -21,6 +21,7 @@ __all__ = [
     "EscalatedTicket",
     "Escalation",
     "EscalationRequest",
+    "EvalQuestion",
     "HumanAnswer",
     "KnowledgePassage",
     "NotEscalated",

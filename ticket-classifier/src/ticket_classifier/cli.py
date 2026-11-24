@@ -3,10 +3,15 @@ from opentelemetry import trace
 from pydantic import ValidationError
 
 from . import commands
-from .args import KbIndexArgs, ResumeArgs, RunArgs, parse_args
+from .args import KbEvalArgs, KbIndexArgs, ResumeArgs, RunArgs, parse_args
 from .config import Settings, get_settings
 from .knowledge.documents import NoDocumentsError
-from .knowledge.store import KnowledgeDatabaseNotConfiguredError
+from .knowledge.embedder import EmbeddingModelMissingError
+from .knowledge.evaluation import results_table
+from .knowledge.store import (
+    KnowledgeDatabaseNotConfiguredError,
+    KnowledgeIndexMissingError,
+)
 from .logging_config import configure_logging
 from .runner import NotPausedError
 from .storage import load_tickets
@@ -36,10 +41,17 @@ def main(argv: list[str] | None = None) -> int:
         case KbIndexArgs():
             with tracer.start_as_current_span("ticket-classifier kb-index"):
                 return handle_kb_index(settings)
+        case KbEvalArgs():
+            with tracer.start_as_current_span("ticket-classifier kb-eval"):
+                return handle_kb_eval(args, settings)
 
 
 def handle_run(args: RunArgs, settings: Settings) -> int:
-    """Load the tickets and run them all; 2 if they cannot be loaded or no API key."""
+    """Load the tickets and run them all.
+
+    2 if the tickets cannot be loaded, the API key is missing or the knowledge base
+    is not ready.
+    """
     tickets_path = args.tickets or settings.tickets_path
     try:
         tickets = load_tickets(tickets_path)
@@ -56,6 +68,17 @@ def handle_run(args: RunArgs, settings: Settings) -> int:
     except commands.MissingApiKeyError as error:
         safe_log.error("%s", error)
         return 2
+    except (
+        KnowledgeDatabaseNotConfiguredError,
+        EmbeddingModelMissingError,
+        KnowledgeIndexMissingError,
+    ) as error:
+        safe_log.error("Knowledge base not ready: %s", type(error).__name__)
+        logger.error("%s", error)
+        return 2
+    except psycopg.OperationalError as error:
+        return database_unreachable(error)
+
     return 1 if batch.failed else 0
 
 
@@ -77,8 +100,32 @@ def handle_kb_index(settings: Settings) -> int:
         safe_log.error("Cannot index the knowledge base: %s", type(error).__name__)
         logger.error("%s", error)
         return 2
-    except psycopg.OperationalError as error:  # database down or login failed
-        safe_log.error("Cannot reach the knowledge database: %s", type(error).__name__)
-        logger.error("%s. Is it running? make db-up", error)
-        return 2
+    except psycopg.OperationalError as error:
+        return database_unreachable(error)
     return 0
+
+
+def handle_kb_eval(args: KbEvalArgs, settings: Settings) -> int:
+    """Compare chunk settings and print the table; 2 if an input is missing."""
+    try:
+        results = commands.evaluate_chunk_settings(settings, args.chunk_settings)
+    except (
+        OSError,
+        ValidationError,
+        KnowledgeDatabaseNotConfiguredError,
+        EmbeddingModelMissingError,
+    ) as error:
+        safe_log.error("Cannot compare chunk settings: %s", type(error).__name__)
+        logger.error("%s", error)
+        return 2
+    except psycopg.OperationalError as error:
+        return database_unreachable(error)
+    print(results_table(results))
+    return 0
+
+
+def database_unreachable(error: psycopg.OperationalError) -> int:
+    """Database down or login failed. The detail can name host and user: full log."""
+    safe_log.error("Cannot reach the knowledge database: %s", type(error).__name__)
+    logger.error("%s. Is it running? make db-up", error)
+    return 2

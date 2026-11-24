@@ -1,9 +1,13 @@
 import pytest
-from helpers import HIGH
+from helpers import HIGH, REFUND_PASSAGE
 from pydantic import ValidationError
 
 from ticket_classifier.cli import main
-from ticket_classifier.models import TicketClassification
+from ticket_classifier.models import KnowledgePassage, TicketClassification
+
+PRIVATE_PASSAGE = KnowledgePassage(
+    source="refunds.md", ordinal=1, text="private policy text", score=0.9
+)
 
 
 def by_name(spans, name):
@@ -66,6 +70,30 @@ def test_ticket_span_has_ids_mode_and_classification(
     assert span.attributes["run_mode"] == "run"
     assert span.attributes["category"] == HIGH.category
     assert span.attributes["priority"] == "high"
+
+
+def test_ticket_span_has_policy_citations_and_top_score(
+    model, knowledge, write_tickets, finished_spans
+):
+    second = REFUND_PASSAGE.model_copy(update={"ordinal": 2, "score": 0.7})
+    knowledge.passages = [REFUND_PASSAGE, second]
+    main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))])
+
+    (span,) = by_name(finished_spans(), "ticket.run")
+    assert span.attributes["knowledge.passages"] == 2
+    assert span.attributes["knowledge.sources"] == ("refunds.md#1", "refunds.md#2")
+    assert span.attributes["knowledge.top_score"] == 0.9
+
+
+def test_ticket_span_without_passages_has_no_top_score(
+    model, knowledge, write_tickets, finished_spans
+):
+    knowledge.passages = []
+    main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))])
+
+    (span,) = by_name(finished_spans(), "ticket.run")
+    assert span.attributes["knowledge.passages"] == 0
+    assert "knowledge.top_score" not in span.attributes
 
 
 def test_second_run_of_a_paused_ticket_keeps_classification(
@@ -167,7 +195,10 @@ def test_only_a_run_without_work_is_marked_reused(model, write_tickets, finished
     assert second.attributes["ticket.status"] == "finished"
 
 
-def test_spans_hold_no_ticket_or_customer_text(model, write_tickets, finished_spans):
+def test_spans_hold_no_ticket_customer_or_policy_text(
+    model, knowledge, write_tickets, finished_spans
+):
+    knowledge.passages = [PRIVATE_PASSAGE]
     model.outcomes["private urgent text"] = HIGH
     model.outcomes["private broken text"] = None
     tickets = write_tickets(
@@ -180,7 +211,14 @@ def test_spans_hold_no_ticket_or_customer_text(model, write_tickets, finished_sp
     main(["resume", "T-1", "--approve", "--note", "private reviewer note"])
 
     exported = " ".join(span.to_json() for span in finished_spans())
-    for private in ("private urgent", "private broken", "private reviewer", "alice"):
+    private_texts = (
+        "private urgent",
+        "private broken",
+        "private reviewer",
+        "private policy",
+        "alice",
+    )
+    for private in private_texts:
         assert private not in exported.lower()
 
 

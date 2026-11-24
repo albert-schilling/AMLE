@@ -202,13 +202,29 @@ def ticket_span(
             TICKET_LOG_FIELDS.reset(token)
 
 
-def record_classification(state: TriageState) -> None:
-    """Put category and priority on the current span, once the state has them."""
+def record_state(state: TriageState) -> None:
+    """Put what the state has so far on the current span: policy passages, category
+    and priority.
+
+    Passages only as citations and scores: their text and the query stay out.
+    """
+    span = trace.get_current_span()
+
+    passages = state.get("knowledge")
+    if passages is not None:
+        span.set_attributes(
+            {
+                "knowledge.passages": len(passages),
+                "knowledge.sources": [passage.citation for passage in passages],
+            }
+        )
+        if passages:
+            span.set_attribute("knowledge.top_score", passages[0].score)
 
     classification = state.get("classification")
 
     if classification is not None:
-        trace.get_current_span().set_attributes(
+        span.set_attributes(
             {
                 "category": classification.category,
                 "priority": classification.priority,

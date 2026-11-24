@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 # .PHONY tells Make that these targets are commands, not actual files on disk
 .PHONY: format lint setup test run approve decline reset help \
-	obs-up obs-down obs-check obs-usage db-up db-down db-check test-db test-embedding kb-index
+	obs-up obs-down obs-check obs-usage db-up db-down db-check test-db test-embedding kb-index kb-eval
 
 # The default target that runs if you just type 'make'
 help:
@@ -26,6 +26,7 @@ help:
 	@echo "  make test-db  - Run the tests that need PostgreSQL (database knowledge_test)"
 	@echo "  make test-embedding - Run the one test with the real embedding model"
 	@echo "  make kb-index - Embed data/knowledge_base into PostgreSQL (first run downloads the model)"
+	@echo "  make kb-eval  - Compare chunk sizes and overlaps on data/eval/knowledge_questions.json"
 
 setup:
 	uv sync
@@ -114,3 +115,7 @@ test-embedding:
 # Local embedding model, no API cost. Skipped if the documents are unchanged.
 kb-index:
 	uv run ticket-classifier kb-index
+
+# Local model, no API cost. Adds one index per chunk setting; run keeps its own.
+kb-eval:
+	uv run ticket-classifier kb-eval
