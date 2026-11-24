@@ -4,18 +4,19 @@ A passage answers a question if it comes from the labelled document and contains
 labelled phrase. Only answerable questions count towards the scores.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 from pydantic import TypeAdapter
 
-from ..context import KnowledgeSearch
 from ..models import EvalQuestion, KnowledgePassage
 from .store import KnowledgeBase
 
 QUESTIONS = TypeAdapter(list[EvalQuestion])
 TOP_K = 3  # passages searched per question, like knowledge_top_k
+
+Search = Callable[[str, int], list[KnowledgePassage]]  # (query, k) -> passages
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,8 @@ class ChunkSettingResult:
     chunk_size: int
     chunk_overlap: int
     chunk_count: int
-    quality: SearchQuality
+    vector: SearchQuality  # embeddings, cosine similarity
+    keyword: SearchQuality  # PostgreSQL full-text search
 
 
 def load_questions(path: Path) -> list[EvalQuestion]:
@@ -62,14 +64,12 @@ def answer_rank(question: EvalQuestion, passages: Sequence[KnowledgePassage]) ->
     return 0
 
 
-def measure(
-    knowledge: KnowledgeSearch, questions: Sequence[EvalQuestion]
-) -> SearchQuality:
+def measure(search: Search, questions: Sequence[EvalQuestion]) -> SearchQuality:
     answerable = [question for question in questions if question.answerable]
     if not answerable:
         raise ValueError("no answerable questions to measure")
     ranks = [
-        answer_rank(question, knowledge.search(question.question, TOP_K))
+        answer_rank(question, search(question.question, TOP_K))
         for question in answerable
     ]
     return SearchQuality(
@@ -85,7 +85,8 @@ def compare_chunk_settings(
     questions: Sequence[EvalQuestion],
     settings: Sequence[tuple[int, int]],
 ) -> list[ChunkSettingResult]:
-    """Build an index per (size, overlap), unless unchanged, and measure each one.
+    """Build an index per (size, overlap), unless unchanged, and measure vector and
+    keyword search on each one.
 
     Every setting keeps its own index, so a later run reuses them.
     """
@@ -95,23 +96,31 @@ def compare_chunk_settings(
         build = variant.build(docs)
         results.append(
             ChunkSettingResult(
-                size, overlap, build.chunk_count, measure(variant, questions)
+                size,
+                overlap,
+                build.chunk_count,
+                vector=measure(variant.search, questions),
+                keyword=measure(variant.keyword_search, questions),
             )
         )
     return results
 
 
 def results_table(results: Sequence[ChunkSettingResult]) -> str:
-    """A Markdown table, best mean reciprocal rank first."""
+    """A Markdown table, best vector mean reciprocal rank first."""
     rows = [
-        "| Size | Overlap | Chunks | Hit@1 | Hit@3 | MRR |",
-        "| ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Size | Overlap | Chunks | Vector Hit@1 | Hit@3 | MRR "
+        "| Keyword Hit@1 | Hit@3 | MRR |",
+        "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
-    ranked = sorted(results, key=lambda r: r.quality.mean_reciprocal_rank, reverse=True)
+    ranked = sorted(results, key=lambda r: r.vector.mean_reciprocal_rank, reverse=True)
     for r in ranked:
-        q = r.quality
         rows.append(
             f"| {r.chunk_size} | {r.chunk_overlap} | {r.chunk_count} "
-            f"| {q.hit_at_1:.2f} | {q.hit_at_3:.2f} | {q.mean_reciprocal_rank:.2f} |"
+            f"| {quality_cells(r.vector)} | {quality_cells(r.keyword)} |"
         )
     return "\n".join(rows)
+
+
+def quality_cells(q: SearchQuality) -> str:
+    return f"{q.hit_at_1:.2f} | {q.hit_at_3:.2f} | {q.mean_reciprocal_rank:.2f}"

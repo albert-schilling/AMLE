@@ -83,19 +83,20 @@ def test_measure_counts_only_answerable_questions():
         question(None, None),  # not counted
     ]
 
-    assert measure(knowledge, questions) == SearchQuality(
+    assert measure(knowledge.search, questions) == SearchQuality(
         hit_at_1=0, hit_at_3=0.5, mean_reciprocal_rank=0.25
     )
 
 
 def test_measure_without_answerable_questions_fails():
     with pytest.raises(ValueError, match="no answerable"):
-        measure(FakeKnowledge(), [question(None, None)])
+        measure(FakeKnowledge().search, [question(None, None)])
 
 
 def test_results_table_puts_the_best_setting_first():
     def result(size, mrr):
-        return ChunkSettingResult(size, 0, 9, SearchQuality(0.5, 1.0, mrr))
+        quality = SearchQuality(0.5, 1.0, mrr)
+        return ChunkSettingResult(size, 0, 9, vector=quality, keyword=quality)
 
     table = results_table([result(30, 0.4), result(120, 0.9)])
 
@@ -117,7 +118,8 @@ def test_each_chunk_setting_gets_its_own_index(knowledge_db):
 
     assert [(r.chunk_size, r.chunk_overlap) for r in results] == [(4, 0), (8, 2)]
     assert results[0].chunk_count > results[1].chunk_count
-    assert all(r.quality.hit_at_3 == 1 for r in results)
+    assert all(r.vector.hit_at_3 == 1 for r in results)
+    assert all(r.keyword.hit_at_3 == 1 for r in results)
     assert index_count(knowledge_db) == 2
 
 

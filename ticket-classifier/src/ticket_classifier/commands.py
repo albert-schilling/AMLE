@@ -128,14 +128,12 @@ def evaluate_chunk_settings(
         results = compare_chunk_settings(knowledge, docs, questions, chunk_settings)
 
     for result in results:
-        quality = result.quality
         safe_log.info(
-            "Chunk size %d, overlap %d: %d chunks, hit@1 %.2f, hit@3 %.2f, MRR %.2f",
+            "Chunk size %d, overlap %d: %d chunks, MRR vector %.2f, keyword %.2f",
             result.chunk_size,
             result.chunk_overlap,
             result.chunk_count,
-            quality.hit_at_1,
-            quality.hit_at_3,
-            quality.mean_reciprocal_rank,
+            result.vector.mean_reciprocal_rank,
+            result.keyword.mean_reciprocal_rank,
         )
     return results

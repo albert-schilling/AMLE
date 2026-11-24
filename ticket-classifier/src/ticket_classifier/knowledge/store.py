@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
     embedding vector({EMBEDDING_DIMENSIONS}) NOT NULL,
     PRIMARY KEY (index_id, source, ordinal)
 );
+
+-- Full-text search. STORED: PostgreSQL 18 makes generated columns virtual by default,
+-- and the GIN index needs stored values. The config is named, as an index requires.
+ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS search_text tsvector
+    GENERATED ALWAYS AS (to_tsvector('english', text)) STORED;
+CREATE INDEX IF NOT EXISTS knowledge_chunks_search_text
+    ON knowledge_chunks USING gin (search_text);
 """
 
 
@@ -171,6 +178,36 @@ class KnowledgeBase:
             " FROM knowledge_chunks WHERE index_id = %(index_id)s"
             " ORDER BY embedding <=> %(query)s LIMIT %(k)s",
             {"query": vector, "index_id": index_id, "k": k},
+        ).fetchall()
+        return [
+            KnowledgePassage(source=source, ordinal=ordinal, text=text, score=score)
+            for source, ordinal, text, score in rows
+        ]
+
+    def keyword_search(self, query: str, k: int) -> list[KnowledgePassage]:
+        """The ``k`` chunks that share the most words with ``query``, best first.
+
+        PostgreSQL full-text search, for comparison with ``search`` in kb-eval; the
+        workflow does not use it. Words are stemmed and stop words dropped. Any word
+        matches (OR): with AND, as in ``websearch_to_tsquery``, a ticket long enough
+        to describe its problem matches no chunk. The score is ``ts_rank_cd``, not
+        comparable with the cosine similarity of ``search``.
+        """
+        if k <= 0:
+            raise ValueError("k must be positive")
+        index_id = self.require_index()
+        # The ticket's own lexemes, joined with |. 'simple' keeps them as they are:
+        # they are stemmed already. Only stop words: NULL, which matches nothing.
+        rows = self.connection.execute(
+            "WITH words AS ("
+            "  SELECT to_tsquery('simple', string_agg(quote_literal(lexeme), ' | '))"
+            "  AS query FROM unnest(to_tsvector('english', %(query)s))"
+            ")"
+            " SELECT source, ordinal, text, ts_rank_cd(search_text, words.query)"
+            " AS score FROM knowledge_chunks, words"
+            " WHERE index_id = %(index_id)s AND search_text @@ words.query"
+            " ORDER BY score DESC, source, ordinal LIMIT %(k)s",
+            {"query": query, "index_id": index_id, "k": k},
         ).fetchall()
         return [
             KnowledgePassage(source=source, ordinal=ordinal, text=text, score=score)

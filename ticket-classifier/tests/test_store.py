@@ -196,6 +196,44 @@ def test_search_ranks_the_matching_chunk_first(knowledge_db):
 
 
 @postgres
+def test_keyword_search_finds_stemmed_words(knowledge_db):
+    knowledge = knowledge_base(knowledge_db, chunk_size=10, chunk_overlap=0)
+    knowledge.build(SEARCH_DOCS)
+
+    hits = knowledge.keyword_search("shipped", k=3)  # stem of "shipping"
+
+    assert {hit.source for hit in hits} == {"shipping.md", "warranty.md"}
+    assert all(hit.score > 0 for hit in hits)
+
+
+@postgres
+def test_keyword_search_needs_any_word_and_ranks_more_shared_words_first(
+    knowledge_db,
+):
+    knowledge = knowledge_base(knowledge_db, chunk_size=10, chunk_overlap=0)
+    knowledge.build(SEARCH_DOCS)
+
+    hits = knowledge.keyword_search("repair of the shipping, it's late", k=3)
+
+    assert [hit.source for hit in hits] == ["warranty.md", "shipping.md"]
+    assert hits[0].score > hits[1].score
+
+
+@postgres
+def test_keyword_search_with_only_stop_words_finds_nothing(knowledge_db):
+    knowledge = knowledge_base(knowledge_db, chunk_size=10, chunk_overlap=0)
+    knowledge.build(SEARCH_DOCS)
+
+    assert knowledge.keyword_search("can I do it", k=3) == []
+
+
+@postgres
+def test_keyword_search_without_index_names_the_fix(knowledge_db):
+    with pytest.raises(KnowledgeIndexMissingError):
+        knowledge_base(knowledge_db).keyword_search("refund", k=3)
+
+
+@postgres
 def test_search_scores_are_the_cosine_similarity(knowledge_db):
     embedder = KeywordEmbedder()
     knowledge = knowledge_base(knowledge_db, embedder, chunk_size=10, chunk_overlap=0)

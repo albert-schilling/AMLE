@@ -162,12 +162,62 @@ Facts to respect:
 
 ## Phase F: Far-reaching goals
 
-24. [ ] PostgreSQL full-text search: generated `tsvector` column, GIN index,
+24. [x] PostgreSQL full-text search: generated `tsvector` column, GIN index,
     `websearch_to_tsquery`, `ts_rank_cd`. Compare with vector search on the question set.
-25. [ ] Optional: hybrid search with reciprocal rank fusion, only if step 24 shows
+
+    `search_text tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED`
+    with a GIN index. `STORED` is required: PostgreSQL 18 makes generated columns
+    virtual by default. `KnowledgeBase.keyword_search` is for `kb-eval` only; the
+    workflow stays on vector search.
+
+    | Method, 60/20 | Hit@1 | Hit@3 | MRR |
+    | --- | ---: | ---: | ---: |
+    | Vector | 0.79 | 0.93 | 0.83 |
+    | Keyword, `websearch_to_tsquery` (AND) | 0.00 | 0.00 | 0.00 |
+    | Keyword, the ticket's words with OR | 0.36 | 0.50 | 0.42 |
+
+    - AND needs every word in one chunk; a ticket long enough to describe its problem
+      never matches. So `keyword_search` joins the ticket's lexemes with OR.
+    - Keyword search misses synonyms: "postage" never finds "shipping", "coffee"
+      never finds "liquid".
+    - It still finds words ("store", "offer") for questions the corpus cannot answer.
+    - It finds no answer that vector search misses, so step 25 is not needed.
+    - The questions are paraphrases on purpose. Tickets with exact terms (VAT, order
+      numbers, product names) would suit keyword search better.
+25. [x] Optional: hybrid search with reciprocal rank fusion, only if step 24 shows
     queries that vector search misses.
-26. [ ] Optional: time exact search on a larger synthetic corpus and compare with HNSW
+
+    Not done: step 24 found no answer that vector search misses.
+
+26. [x] Optional: time exact search on a larger synthetic corpus and compare with HNSW
     (`vector_cosine_ops`).
+
+    Clustered random 384-dim vectors, 50 queries, top 3, HNSW defaults (`m` 16,
+    `ef_construction` 64, `ef_search` 40). Temp table, rolled back. Median per query:
+
+    | Rows | Table | HNSW index | Build | Exact | HNSW | HNSW recall@3 |
+    | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+    | 1,000 | 2 MB | 2 MB | 0.1 s | 0.4 ms | not used by the planner | - |
+    | 10,000 | 16 MB | 20 MB | 1.2 s | 3.4 ms | 0.4 ms | 1.00 |
+    | 100,000 | 157 MB | 195 MB | 18.8 s | 28 ms | 0.7 ms | 0.97 |
+
+    With `WHERE index_id = ...` matching 5% of rows, like our search does:
+
+    | Rows | HNSW rows returned | Recall | With `hnsw.iterative_scan = relaxed_order` |
+    | ---: | ---: | ---: | --- |
+    | 10,000 | 1.7 of 3 | 0.58 | 3 of 3, recall 0.99, 0.6 ms |
+    | 100,000 | 1.8 of 3 | 0.59 | 3 of 3, recall 0.98, 0.9 ms |
+
+    - Exact search grows linearly, about 0.3 ms per 1,000 rows. Our 29 chunks need no
+      index; the planner ignores one below a few thousand rows anyway.
+    - HNSW stays under 1 ms at 100,000 rows, but costs build time and more space than
+      the table itself.
+    - HNSW filters after the index scan. Our search filters by `index_id`, so with
+      several indexes in one table it returns fewer than `k` passages. Fix with
+      iterative scans (pgvector 0.8), a partial index per `index_id`, or one table per
+      index.
+    - Pure random vectors gave recall 0.37 at 100,000 rows: HNSW needs data with
+      structure, which real embeddings have.
 27. [ ] Update `README.md` and `docs/conventions.md`.
 
 ## Phase G: Type checks (after the user story)

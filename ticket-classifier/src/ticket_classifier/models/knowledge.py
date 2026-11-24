@@ -22,7 +22,9 @@ class KnowledgePassage(BaseModel):
     source: str
     ordinal: int
     text: str
-    score: float  # cosine similarity: 1 same meaning, around 0.5 unrelated
+    # Vector search: cosine similarity, 1 same meaning, around 0.5 unrelated.
+    # Keyword search: ts_rank_cd, from 0 up, not comparable with cosine.
+    score: float
 
     @property
     def citation(self) -> str:

@@ -135,12 +135,19 @@ def evaluate(mocker):
 
 def test_kb_eval_prints_the_table(evaluate, capsys):
     evaluate.return_value = [
-        ChunkSettingResult(30, 0, 40, SearchQuality(0.5, 0.75, 0.6))
+        ChunkSettingResult(
+            30,
+            0,
+            40,
+            vector=SearchQuality(0.5, 0.75, 0.6),
+            keyword=SearchQuality(0.25, 0.5, 0.3),
+        )
     ]
 
     assert main(["kb-eval", "--sizes", "30", "--overlaps", "0"]) == 0
     assert evaluate.call_args.args[1] == [(30, 0)]
-    assert "| 30 | 0 | 40 | 0.50 | 0.75 | 0.60 |" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "| 30 | 0 | 40 | 0.50 | 0.75 | 0.60 | 0.25 | 0.50 | 0.30 |" in out
 
 
 @pytest.mark.parametrize(
