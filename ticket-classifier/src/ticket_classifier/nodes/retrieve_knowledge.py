@@ -30,6 +30,6 @@ def node_retrieve_knowledge(
         "Ticket %s: %d policy passages: %s",
         ticket.id,
         len(passages),
-        ", ".join(f"{p.source}#{p.ordinal} {p.score:.3f}" for p in passages),
+        ", ".join(f"{p.citation} {p.score:.3f}" for p in passages),
     )
     return {"knowledge": passages}

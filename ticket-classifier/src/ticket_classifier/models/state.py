@@ -28,8 +28,7 @@ class TriageState(TypedDict):
 
     ticket: Ticket
     customer: NotRequired[Customer | None]  # None: no id, unknown, or unreadable
-    # Policy passages for the ticket, best first. Missing in runs saved before the
-    # knowledge base existed.
+    # Policy passages for the ticket, best first.
     knowledge: NotRequired[list[KnowledgePassage]]
     classification: NotRequired[TicketClassification]
     escalation: NotRequired[Escalation]
@@ -43,6 +42,7 @@ class EscalationRequest(TypedDict):
     ticket: Ticket
     customer: Customer | None
     classification: TicketClassification
+    policies: list[KnowledgePassage]  # the passages triage saw, best first
 
 
 class HumanAnswer(TypedDict):

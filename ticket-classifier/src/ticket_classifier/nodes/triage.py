@@ -32,7 +32,12 @@ def node_triage(state: TriageState, writer: StreamWriter = ignore_event) -> Tria
             max_tokens=settings.max_tokens,
             system=SYSTEM_PROMPT,
             messages=[
-                {"role": "user", "content": create_prompt(ticket, state["customer"])}
+                {
+                    "role": "user",
+                    "content": create_prompt(
+                        ticket, state["customer"], state["knowledge"]
+                    ),
+                }
             ],
             output_format=TicketClassification,
         )

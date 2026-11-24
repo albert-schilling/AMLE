@@ -2,7 +2,7 @@
 
 import anthropic
 import pytest
-from helpers import HIGH, LOW
+from helpers import HIGH, LOW, REFUND_PASSAGE
 from langgraph.checkpoint.memory import InMemorySaver
 
 from ticket_classifier.checkpoint import thread_config
@@ -50,6 +50,7 @@ def test_high_priority_ticket_pauses_for_a_human(
     assert request["ticket"].text == "urgent"
     assert request["customer"].first_name == "Alice"
     assert request["classification"] == HIGH
+    assert request["policies"] == [REFUND_PASSAGE]
 
 
 def test_paused_ticket_stays_paused_on_the_next_run(

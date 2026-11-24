@@ -84,9 +84,9 @@ Facts to respect:
     and the type in `CHECKPOINT_TYPES`.
 14. [x] Node `retrieve_knowledge` between `get_customer` and `triage`, using the ticket
     text as the query. Saved threads without the key must still run and resume.
-15. [ ] `create_prompt`: add passages in `<policy source="...">` tags. Update the system
+15. [x] `create_prompt`: add passages in `<policy source="...">` tags. Update the system
     prompt: policies inform the classification, ticket text stays untrusted.
-16. [ ] Show the passage sources to the human reviewer in the pause request.
+16. [x] Show the passage sources to the human reviewer in the pause request.
 17. [ ] Before the first ticket, fail with a clear message if the database is down or
     the index is missing, so no API money is spent.
 18. [ ] Telemetry: span attributes and a `safe_log` line with passage count, top score

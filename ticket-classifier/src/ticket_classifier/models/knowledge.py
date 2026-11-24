@@ -21,3 +21,8 @@ class KnowledgePassage(BaseModel):
     ordinal: int
     text: str
     score: float  # cosine similarity: 1 same meaning, around 0.5 unrelated
+
+    @property
+    def citation(self) -> str:
+        """Where the passage comes from, e.g. ``refunds.md#1``."""
+        return f"{self.source}#{self.ordinal}"

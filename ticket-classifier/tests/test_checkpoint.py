@@ -42,6 +42,9 @@ def test_escalation_request_with_models_survives_the_serializer():
         "ticket": Ticket(id="T-1", text="x"),
         "customer": None,
         "classification": TicketClassification(category="billing", priority="high"),
+        "policies": [
+            KnowledgePassage(source="refunds.md", ordinal=1, text="5 days", score=0.9)
+        ],
     }
 
     assert (
