@@ -92,7 +92,18 @@ Facts to respect:
     the index is missing, so no API money is spent.
 18. [x] Telemetry: span attributes and a `safe_log` line with passage count, top score
     and source names. Test that no passage or query text is exported.
-19. [ ] One real end-to-end check with `make run`. **Costs money: ask first.**
+19. [x] One real end-to-end check with `make run`. **Costs money: ask first.**
+
+    8 fixture tickets, 60/20, minimum score 0.5: exit 0, 5 classified, 3 paused, 0
+    failed. Every ticket got 3 passages, none below the minimum.
+    - Billing and account tickets got matching passages (top scores 0.72 to 0.77).
+    - The CSV export ticket (technical) got unrelated billing, account and shipping
+      passages at 0.60 to 0.62, and was still classified technical, high. The prompt's
+      "can be unrelated" rule held, and the floor of 0.5 is too low to drop them.
+    - A second run with telemetry on reused all 8 tickets (no API call). In Tempo each
+      `ticket.run` span has `knowledge.passages`, `knowledge.top_score` and
+      `knowledge.sources`, read from the saved state. No passage or ticket text in the
+      trace; Loki got only the safe lines.
 
 ## Phase E: Experiments (no API cost)
 

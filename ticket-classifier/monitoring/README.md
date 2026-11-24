@@ -33,6 +33,7 @@ Telemetry is off by default. Turn it on for one command, or set it in the app's 
 ```sh
 OTEL_ENABLED=true make run                              # calls the Anthropic API
 OTEL_ENABLED=true make approve TICKET=T-1001 NOTE="..."
+OTEL_ENABLED=true make kb-index                          # local model, no API cost
 OTEL_ENABLED=true OTEL_EXPORTER_OTLP_ENDPOINT= make run # print to the console instead
 ```
 
@@ -43,7 +44,7 @@ Three dashboards, linked at the top of each:
 | Dashboard | Shows |
 | --- | --- |
 | [Ticket Classifier](http://localhost:3000/d/ticket-classifier) | metrics: tickets, latency, tokens, cost |
-| [Traces](http://localhost:3000/d/ticket-classifier-traces) | ticket runs, paused and failed tickets, slow model calls |
+| [Traces](http://localhost:3000/d/ticket-classifier-traces) | ticket runs, paused and failed tickets, slow model calls, weak policy matches (threshold in the `weak_score` box) |
 | [Logs](http://localhost:3000/d/ticket-classifier-logs) | log volume and lines, by ticket or search text |
 
 To jump between signals:
@@ -56,13 +57,13 @@ A `run` and its later `resume` are two traces. `ticket_id` connects them.
 ## Query cookbook
 
 Paste one query (without its `#` title) into Grafana → Explore. All were tested against
-this stack.
+this stack; some return nothing until a run produces a match.
 
 ### Tempo (TraceQL)
 
 ```text
 # All commands
-{resource.service.name="ticket-classifier" && name=~"ticket-classifier (run|resume)"}
+{resource.service.name="ticket-classifier" && name=~"ticket-classifier (run|resume|kb-index|kb-eval)"}
 
 # All traces of a ticket
 {resource.service.name="ticket-classifier" && span.ticket_id="T-1001"}
@@ -78,6 +79,21 @@ this stack.
 
 # High priority tickets
 {resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.priority="high"} | select(span.ticket_id, span.run_mode, span.ticket.status, span.category, span.priority)
+
+# Policy passages per ticket
+{resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.knowledge.passages > 0} | select(span.ticket_id, span.knowledge.top_score, span.knowledge.sources)
+
+# Weak policy matches (best passage below 0.65)
+{resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.knowledge.top_score < 0.65} | select(span.ticket_id, span.knowledge.top_score, span.knowledge.sources)
+
+# Tickets without policy passages
+{resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.knowledge.passages = 0} | select(span.ticket_id, span.category, span.priority)
+
+# Tickets that got one policy part (matches any element of the list)
+{resource.service.name="ticket-classifier" && span.knowledge.sources = "warranty.md#3"} | select(span.ticket_id, span.knowledge.sources)
+
+# Retrieval steps over 100 ms
+{resource.service.name="ticket-classifier" && name="langgraph.node.retrieve_knowledge" && duration > 100ms}
 
 # Model calls over 1 s
 {resource.service.name="ticket-classifier" && name="anthropic.messages.create" && duration > 1s}
@@ -106,6 +122,12 @@ adds columns to the result table.
 
 # Text search
 {service_name="ticket-classifier"} |= "waits for a human"
+
+# Policy passages found per ticket (citations and scores)
+{service_name="ticket-classifier"} |= "policy passages"
+
+# Tickets where passages fell below KNOWLEDGE_MIN_SCORE
+{service_name="ticket-classifier"} |~ "[1-9][0-9]* below the minimum score"
 
 # Lines per level
 sum by (severity_text) (count_over_time({service_name="ticket-classifier"}[1h]))
@@ -192,7 +214,7 @@ flowchart LR
 
 | Signal | What it answers | Example |
 | --- | --- | --- |
-| Trace | What happened in one run, step by step, how long each step took | ticket T-3: `get_customer` 2 ms, `triage` 1.8 s, `human_review` paused |
+| Trace | What happened in one run, step by step, how long each step took | ticket T-3: `get_customer` 2 ms, `retrieve_knowledge` 16 ms, `triage` 1.8 s, `human_review` paused |
 | Metric | How much, how often, over time (numbers only) | tokens per hour, cost per day, p95 latency of `triage` |
 | Log | What a step said, as text with attributes | `Ticket T-3 waits for a human` |
 
@@ -221,11 +243,20 @@ flowchart LR
   ticket-classifier run | resume        cli.py
   └─ ticket.run | ticket.resume         telemetry.ticket_span, one per ticket
      └─ langgraph.graph.stream          TraceVerde, session.id = ticket id
-        ├─ langgraph.node.<node>        TraceVerde
+        ├─ langgraph.node.<node>        TraceVerde, e.g. retrieve_knowledge, triage
         │  └─ anthropic.messages.create Anthropic SDK: tokens; TraceVerde: cost
+  ticket-classifier kb-index | kb-eval  cli.py, no child spans
   ```
 
+  The knowledge base has no spans of its own: only the Anthropic and LangGraph
+  instrumentations are on, so the PostgreSQL queries and the embedding model are not
+  traced. Their time is inside the `langgraph.node.retrieve_knowledge` span.
+
 - **Status:** ticket spans have `ticket.status` (`finished`, `paused`, `failed`).
+- **Knowledge:** ticket spans have `knowledge.passages` (count), `knowledge.sources`
+  (citations such as `refunds.md#2`, best first) and `knowledge.top_score` (cosine
+  similarity of the best passage; missing without passages). They are read from the
+  saved state, so a reused run has them too.
 - **Pauses:** a ticket waiting for a human has `ticket.status=paused` on its span,
   and a `paused` event when the run stops. It is not an error.
 - **Stored:** Tempo first writes spans to a write-ahead log (WAL), then packs them into
@@ -316,8 +347,13 @@ The volumes have no size quota on macOS. Docker Desktop's disk image size
   the environment says.
 - Spans hold no prompt or answer text; Loki gets no ticket, customer or reviewer
   text.
-- `output/trace.jsonl` has the full graph states. It stays a local file and is not
-  exported.
+- Policy passages reach spans and Loki only as citations and scores, never their text
+  or the query (the ticket text).
+- The knowledge base is local too: the embedding model runs on this machine
+  (Hugging Face telemetry off), and PostgreSQL ([database/](../database/)) is not part
+  of this stack and sends nothing.
+- `output/trace.jsonl` has the full graph states, including passages. It stays a local
+  file and is not exported.
 - The app itself still sends ticket and customer data to the Anthropic API: that is
   how it classifies tickets.
 - Grafana and the collector are on the normal network. Grafana may download a missing

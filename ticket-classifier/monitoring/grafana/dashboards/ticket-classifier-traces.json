@@ -25,6 +25,16 @@
           "text": ".*",
           "value": ".*"
         }
+      },
+      {
+        "name": "weak_score",
+        "label": "Weak match below (cosine)",
+        "type": "textbox",
+        "query": "0.65",
+        "current": {
+          "text": "0.65",
+          "value": "0.65"
+        }
       }
     ]
   },
@@ -175,6 +185,43 @@
           },
           "queryType": "traceql",
           "query": "{resource.service.name=\"ticket-classifier\" && name=\"anthropic.messages.create\" && duration > 1s}",
+          "tableType": "spans",
+          "limit": 50,
+          "spss": 10,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Weak policy matches",
+      "description": "Ticket runs whose best policy passage scored below the threshold: the prompt likely got unrelated policies. Citations and scores only, no passage text.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"ticket-classifier\" && name=\"ticket.run\" && span.ticket.reused = nil && span.knowledge.top_score < $weak_score && span.ticket_id=~\"$ticket_id\"} | select(span.ticket_id, span.knowledge.top_score, span.knowledge.sources, span.category, span.priority)",
           "tableType": "spans",
           "limit": 50,
           "spss": 10,
