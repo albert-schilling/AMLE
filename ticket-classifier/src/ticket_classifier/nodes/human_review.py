@@ -6,6 +6,7 @@ from ..models import (
     HumanAnswer,
     NotEscalated,
     TriageState,
+    TriageUpdate,
 )
 from ..telemetry import get_loggers
 
@@ -24,7 +25,7 @@ def escalation_request(state: TriageState) -> EscalationRequest:
     }
 
 
-def node_human_review(state: TriageState) -> TriageState:
+def node_human_review(state: TriageState) -> TriageUpdate:
     """Pause the run until a person answers with a ``HumanAnswer``."""
     # Runs again on resume: everything above interrupt() must be safe to repeat.
     answer: HumanAnswer = interrupt(escalation_request(state))

@@ -1,13 +1,13 @@
 from pydantic import ValidationError
 
 from ..customers import get_customer
-from ..models import TriageState
+from ..models import TriageState, TriageUpdate
 from ..telemetry import get_loggers
 
 logger, safe_log = get_loggers(__name__)
 
 
-def node_get_customer(state: TriageState) -> TriageState:
+def node_get_customer(state: TriageState) -> TriageUpdate:
     """Look up the ticket's customer; None if there is no id, no match or no data."""
     ticket = state["ticket"]
     if not ticket.customer_id:

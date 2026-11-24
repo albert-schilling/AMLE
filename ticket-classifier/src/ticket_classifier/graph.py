@@ -22,10 +22,13 @@ from .nodes.names import (
     TRIAGE,
 )
 
+# State, runtime context, input and output types of the compiled graph.
+Workflow = CompiledStateGraph[TriageState, WorkflowContext, TriageState, TriageState]
+
 
 def build_workflow(
-    checkpointer: BaseCheckpointSaver | None = None,
-) -> CompiledStateGraph:
+    checkpointer: BaseCheckpointSaver[str] | None = None,
+) -> Workflow:
     """Wire the nodes and compile. A checkpointer makes the runs resumable.
 
     Runs that reach ``retrieve_knowledge`` need a ``WorkflowContext``.
@@ -48,7 +51,7 @@ def build_workflow(
     return builder.compile(checkpointer=checkpointer)
 
 
-def write_mermaid(workflow: CompiledStateGraph, path: Path) -> None:
+def write_mermaid(workflow: Workflow, path: Path) -> None:
     """Save the graph as a mermaid diagram."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(workflow.get_graph().draw_mermaid(), encoding="utf-8")

@@ -119,7 +119,7 @@ def configure_telemetry(settings: Settings) -> None:
 
     import genai_otel  # only when enabled: it sets up global OTel providers
 
-    genai_otel.instrument()
+    genai_otel.instrument()  # type: ignore[no-untyped-call]  # TraceVerde has no hints
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):  # it logs setup errors, no raise
         raise TelemetrySetupError("TraceVerde could not start, see the log above")
@@ -157,7 +157,9 @@ def attach_log_handler(
     return provider
 
 
-def get_loggers(name: str) -> tuple[logging.Logger, logging.LoggerAdapter]:
+def get_loggers(
+    name: str,
+) -> tuple[logging.Logger, logging.LoggerAdapter[logging.Logger]]:
     """Two loggers for a module: console only, and console plus Loki.
 
     Use the second only for ids, counts and labels.

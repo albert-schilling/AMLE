@@ -2,7 +2,7 @@ from langgraph.runtime import Runtime
 
 from ..config import get_settings
 from ..context import WorkflowContext
-from ..models import TriageState
+from ..models import TriageState, TriageUpdate
 from ..telemetry import get_loggers
 
 logger, safe_log = get_loggers(__name__)
@@ -14,7 +14,7 @@ class MissingContextError(RuntimeError):
 
 def node_retrieve_knowledge(
     state: TriageState, runtime: Runtime[WorkflowContext]
-) -> TriageState:
+) -> TriageUpdate:
     """Find the policy passages closest in meaning to the ticket text, leaving out
     those too weak to help."""
 

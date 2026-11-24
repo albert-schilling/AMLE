@@ -3,14 +3,17 @@
 import json
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 from .config import get_settings
 from .models import Customer
 
 
 @cache
-def load_customers(path: Path) -> dict[str, dict]:
-    return json.loads(path.read_text(encoding="utf-8"))
+def load_customers(path: Path) -> dict[str, dict[str, Any]]:
+    """Raw records by customer id; ``get_customer`` validates one when it is used."""
+    records: dict[str, dict[str, Any]] = json.loads(path.read_text(encoding="utf-8"))
+    return records
 
 
 def get_customer(customer_id: str) -> Customer | None:

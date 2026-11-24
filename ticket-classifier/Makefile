@@ -11,7 +11,7 @@ help:
 	@echo "  make setup   - Install dependencies and prepare the project"
 	@echo "  make test    - Run the project test suite"
 	@echo "  make format  - Format the code using ruff"
-	@echo "  make lint    - Lint the code using ruff"
+	@echo "  make lint    - Lint with ruff and check types with mypy (strict, src only)"
 	@echo "  make run     - Run the classifier script"
 	@echo "  make approve TICKET=T-1 NOTE=\"...\" - A human takes over a paused ticket"
 	@echo "  make decline TICKET=T-1 NOTE=\"...\" - No human takes over a paused ticket"
@@ -39,6 +39,7 @@ format:
 
 lint:
 	uv run ruff check
+	uv run mypy
 
 run:
 	@echo "REQUIREMENT: Anthropic API Key in the environment"

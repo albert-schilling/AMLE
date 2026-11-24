@@ -1,14 +1,15 @@
 """Run tickets through the workflow: one thread per ticket, every run streamed."""
 
 from dataclasses import dataclass, field
+from typing import cast
 
 from anthropic import APIError
 from langgraph.graph import END
-from langgraph.graph.state import CompiledStateGraph
-from langgraph.types import Command
+from langgraph.types import Command, StateSnapshot
 
 from .checkpoint import run_status, thread_config
 from .context import WorkflowContext
+from .graph import Workflow
 from .models import (
     ClassifiedTicket,
     Escalated,
@@ -45,7 +46,7 @@ class NotPausedError(LookupError):
 
 
 def run_all(
-    tickets: list[Ticket], *, workflow: CompiledStateGraph, context: WorkflowContext
+    tickets: list[Ticket], *, workflow: Workflow, context: WorkflowContext
 ) -> BatchResult:
     """Run every ticket; a failing ticket is recorded and skipped."""
     batch = BatchResult()
@@ -70,7 +71,7 @@ def run_all(
 
 
 def run_ticket(
-    workflow: CompiledStateGraph, context: WorkflowContext, ticket: Ticket
+    workflow: Workflow, context: WorkflowContext, ticket: Ticket
 ) -> TriageState | None:
     """Run one ticket and return its final state; None while it waits for a human.
 
@@ -79,7 +80,7 @@ def run_ticket(
     """
     saved = workflow.get_state(thread_config(ticket.id))
 
-    record_state(saved.values)  # a paused or finished run has them already
+    record_state(state_values(saved))  # a paused or finished run has them already
 
     match run_status(saved):
         case "paused":
@@ -95,14 +96,14 @@ def run_ticket(
             safe_log.info(
                 "Ticket %s already finished, using the saved result", ticket.id
             )
-            return saved.values
+            return state_values(saved)
         case "new":
             safe_log.info("Starting run of ticket %s", ticket.id)
             return run_thread(workflow, TriageState(ticket=ticket), ticket.id, context)
 
 
 def resume_ticket(
-    workflow: CompiledStateGraph, ticket_id: str, answer: HumanAnswer
+    workflow: Workflow, ticket_id: str, answer: HumanAnswer
 ) -> TriageState | None:
     """Answer a paused run; ``answer`` becomes the return value of ``interrupt()``.
 
@@ -121,8 +122,8 @@ def resume_ticket(
 
 
 def run_thread(
-    workflow: CompiledStateGraph,
-    run_input: TriageState | Command | None,
+    workflow: Workflow,
+    run_input: TriageState | Command[str] | None,
     ticket_id: str,
     context: WorkflowContext | None,
 ) -> TriageState | None:
@@ -133,6 +134,7 @@ def run_thread(
     config = thread_config(ticket_id)
     # "sync" saves each checkpoint before the next step starts, so a killed run
     # can continue. "custom" carries events that nodes emit while they work.
+    # version "v2": each part is a typed dict with its stream mode in "type".
 
     stream = workflow.stream(
         run_input,
@@ -140,20 +142,22 @@ def run_thread(
         context=context,
         stream_mode=["updates", "custom"],
         durability="sync",
+        version="v2",
     )
 
-    for mode, data in stream:
-        if mode == "custom":
-            logger.info("[custom] %s", data)
-            continue
-        logger.debug("[updates] %s", data)
-        for node_name, update in data.items():
-            if node_name != "__interrupt__":  # the pause is read from the state below
-                trace_event(ticket_id, node_name, "updated", update)
+    for part in stream:
+        if part["type"] == "custom":
+            logger.info("[custom] %s", part["data"])
+        elif part["type"] == "updates":
+            logger.debug("[updates] %s", part["data"])
+
+            for node_name, update in part["data"].items():
+                if node_name != "__interrupt__":  # the pause is read from the state
+                    trace_event(ticket_id, node_name, "updated", update)
 
     state = workflow.get_state(config)
 
-    record_state(state.values)
+    record_state(state_values(state))
 
     if state.interrupts:
         requests = [item.value for item in state.interrupts]
@@ -163,20 +167,36 @@ def run_thread(
         record_pause(state.next[0])
         return None
     record_status("finished")
-    trace_event(ticket_id, END, "finished", state.values)
-    return state.values
+
+    values = state_values(state)
+    trace_event(ticket_id, END, "finished", values)
+
+    return values
+
+
+def state_values(snapshot: StateSnapshot) -> TriageState:
+    """The saved state of a run. LangGraph types it as a plain dict; our graph's state
+    schema is ``TriageState``, and the checkpointer loads only its types."""
+    return cast(TriageState, snapshot.values)
 
 
 def to_classified_ticket(result: TriageState) -> ClassifiedTicket:
     """Turn the final state into a resolved or an escalated ticket."""
     classification = result["classification"]
     escalation = result["escalation"]
-    fields = {
-        "ticket_id": result["ticket"].id,
-        "customer_id": result["customer"].id if result["customer"] else None,
-        "category": classification.category,
-        "priority": classification.priority,
-    }
+    ticket_id = result["ticket"].id
+    customer_id = result["customer"].id if result["customer"] else None
     if isinstance(escalation, Escalated):
-        return EscalatedTicket(**fields, escalation_reason=escalation.escalation_reason)
-    return ResolvedTicket(**fields)
+        return EscalatedTicket(
+            ticket_id=ticket_id,
+            customer_id=customer_id,
+            category=classification.category,
+            priority=classification.priority,
+            escalation_reason=escalation.escalation_reason,
+        )
+    return ResolvedTicket(
+        ticket_id=ticket_id,
+        customer_id=customer_id,
+        category=classification.category,
+        priority=classification.priority,
+    )

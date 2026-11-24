@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 import psycopg
 from pgvector.psycopg import register_vector
+from psycopg.rows import TupleRow
 from pydantic import SecretStr
 
 from ..config import Settings
@@ -69,6 +70,14 @@ class BuildResult:
     index_id: int
     chunk_count: int
     reused: bool  # True: documents unchanged, nothing was embedded
+
+
+def fetch_one(cursor: psycopg.Cursor[TupleRow]) -> TupleRow:
+    """The row of a query that always returns one: ``RETURNING``, ``count(*)``."""
+    row = cursor.fetchone()
+    if row is None:
+        raise RuntimeError("the query returned no row")
+    return row
 
 
 def create_schema(connection: psycopg.Connection) -> None:
@@ -137,15 +146,22 @@ class KnowledgeBase:
         vectors = self.embedder.embed_passages([chunk.text for chunk in chunks])
 
         with self.connection.transaction():
-            (index_id,) = self.connection.execute(
-                "INSERT INTO knowledge_indexes"
-                " (model, chunk_size, chunk_overlap, corpus_hash)"
-                " VALUES (%s, %s, %s, %s)"
-                " ON CONFLICT (model, chunk_size, chunk_overlap) DO UPDATE"
-                " SET corpus_hash = EXCLUDED.corpus_hash, built_at = now()"
-                " RETURNING id",
-                (self.embedder.model, self.chunk_size, self.chunk_overlap, fingerprint),
-            ).fetchone()
+            (index_id,) = fetch_one(
+                self.connection.execute(
+                    "INSERT INTO knowledge_indexes"
+                    " (model, chunk_size, chunk_overlap, corpus_hash)"
+                    " VALUES (%s, %s, %s, %s)"
+                    " ON CONFLICT (model, chunk_size, chunk_overlap) DO UPDATE"
+                    " SET corpus_hash = EXCLUDED.corpus_hash, built_at = now()"
+                    " RETURNING id",
+                    (
+                        self.embedder.model,
+                        self.chunk_size,
+                        self.chunk_overlap,
+                        fingerprint,
+                    ),
+                )
+            )
             # The old chunks of this index only; other indexes stay as they are.
             self.connection.execute(
                 "DELETE FROM knowledge_chunks WHERE index_id = %s", (index_id,)
@@ -244,7 +260,10 @@ class KnowledgeBase:
         )
 
     def count_chunks(self, index_id: int) -> int:
-        (count,) = self.connection.execute(
-            "SELECT count(*) FROM knowledge_chunks WHERE index_id = %s", (index_id,)
-        ).fetchone()
+        row = fetch_one(
+            self.connection.execute(
+                "SELECT count(*) FROM knowledge_chunks WHERE index_id = %s", (index_id,)
+            )
+        )
+        count: int = row[0]
         return count

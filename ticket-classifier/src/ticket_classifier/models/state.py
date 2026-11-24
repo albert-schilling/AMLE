@@ -1,6 +1,6 @@
 """What the graph carries and saves in checkpoints."""
 
-from typing import Annotated, Literal, NotRequired, TypedDict
+from typing import Annotated, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -20,18 +20,22 @@ class Escalated(BaseModel):
 Escalation = Annotated[NotEscalated | Escalated, Field(discriminator="escalated")]
 
 
-class TriageState(TypedDict):
+class TriageUpdate(TypedDict, total=False):
+    """What a node returns: only the keys it writes. All keys may be missing."""
+
+    customer: Customer | None  # None: no id, unknown, or unreadable
+    knowledge: list[KnowledgePassage]  # policy passages for the ticket, best first
+    classification: TicketClassification
+    escalation: Escalation
+
+
+class TriageState(TriageUpdate):
     """One ticket's run. Only ``ticket`` is given at the start; nodes add the rest.
 
     A TypedDict has no defaults: a key that no node has written yet is missing.
     """
 
     ticket: Ticket
-    customer: NotRequired[Customer | None]  # None: no id, unknown, or unreadable
-    # Policy passages for the ticket, best first.
-    knowledge: NotRequired[list[KnowledgePassage]]
-    classification: NotRequired[TicketClassification]
-    escalation: NotRequired[Escalation]
 
 
 class EscalationRequest(TypedDict):

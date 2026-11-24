@@ -10,6 +10,7 @@ from .state import (
     HumanAnswer,
     NotEscalated,
     TriageState,
+    TriageUpdate,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "TicketClassification",
     "TicketResult",
     "TriageState",
+    "TriageUpdate",
 ]

@@ -21,8 +21,14 @@ Vector = NDArray[np.float32]
 
 
 class Embedder(Protocol):
-    model: str  # vectors of different models cannot be compared
-    dimensions: int
+    # Read-only properties: a frozen dataclass or a class attribute fits both.
+    @property
+    def model(self) -> str:
+        """Vectors of different models cannot be compared."""
+        ...
+
+    @property
+    def dimensions(self) -> int: ...
 
     def embed_passages(self, texts: Sequence[str]) -> list[Vector]:
         """Vectors for stored text, one per text, in the same order."""

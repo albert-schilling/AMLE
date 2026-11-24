@@ -27,13 +27,21 @@ Write clean code for humans: code a reader understands on the first pass.
   `checkpoint.run_status`.
 - The checkpointer is passed to `build_workflow`, never created inside it.
 - `cli.py` maps commands to exit codes; the work happens in `commands.py`.
+- A command checks what it needs (API key, database, model, index) before the first
+  ticket, so a missing piece costs no API call.
+- Handles a node needs, like the knowledge base, come through the runtime context
+  (`WorkflowContext`), not through the state: the state is saved in checkpoints.
+- A new type in the graph state joins `CHECKPOINT_TYPES`, or it loads back as a plain
+  dict.
+- A `Protocol` lives with the code that uses it, not with the code that implements it.
 
 ## Logging
 
 - `logger, safe_log = get_loggers(__name__)`: `logger` writes to the console only,
   `safe_log` also sends the line to Loki.
 - Use `safe_log` only for ids, counts and labels: never file paths or ticket, customer,
-  reviewer or error text.
+  reviewer or error text. Policy passages: citations (`refunds.md#2`) and scores only,
+  never their text or the query.
 - For a caught error, log its type with `safe_log` and the full error with `logger`.
 
 ## Types
@@ -41,6 +49,9 @@ Write clean code for humans: code a reader understands on the first pass.
 - Type everything where possible: arguments, return values, attributes. Use `Any`
   only where no real type exists.
 - A type from a module that is imported lazily goes under `if TYPE_CHECKING:`.
+- `make lint` runs mypy in strict mode on `src`. `# type: ignore[code]` or `cast` only
+  where a library has no real type, with a comment saying why.
+- A node returns `TriageUpdate` (only the keys it writes), never `TriageState`.
 - A `TypedDict` has no defaults: mark keys that may be missing with `NotRequired`.
 - Use a `dataclass` for internal objects, pydantic for data from outside (files, model
   output), a `TypedDict` where LangGraph needs a plain dict.
@@ -63,6 +74,9 @@ treats `_name` in a model as a private attribute).
 - Test behaviour, not the code's shape: a test must be able to fail when our code is
   wrong. No tests of constants, declarations, defaults or pydantic itself.
 - Never import from `conftest.py`; shared test data goes in `tests/helpers.py`.
+- Tests that need PostgreSQL are marked `postgres`, use the `knowledge_db` fixture
+  (rolled back after each test) and run with `make test-db`; `make test` skips them.
+  The knowledge base is faked with `FakeKnowledge` and `KeywordEmbedder`.
 
 ## Writing
 

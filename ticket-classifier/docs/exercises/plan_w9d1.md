@@ -218,14 +218,30 @@ Facts to respect:
       index.
     - Pure random vectors gave recall 0.37 at 100,000 rows: HNSW needs data with
       structure, which real embeddings have.
-27. [ ] Update `README.md` and `docs/conventions.md`.
+27. [x] Update `README.md` and `docs/conventions.md`.
 
 ## Phase G: Type checks (after the user story)
 
-28. [ ] Pick a type checker for Python 3.14 (mypy, pyright or ty), from the official
+28. [x] Pick a type checker for Python 3.14 (mypy, pyright or ty), from the official
     docs. Add it to the dev dependencies and to `make lint`.
-29. [ ] Fix the errors it finds, without `Any` or `# type: ignore` where a real type
+
+    mypy 2.4, `strict`, with the pydantic plugin. Stable, supports Python 3.14, and
+    pydantic tests its plugin against it. ty is faster and fits ruff and uv, but is
+    beta: its diagnostics can change between any two versions. pyright needs Node.
+    Runs in `make lint` (src only). The first run found 41 errors in 11 files.
+29. [x] Fix the errors it finds, without `Any` or `# type: ignore` where a real type
     exists.
+
+    - Nodes return `TriageUpdate`, a `total=False` TypedDict; `TriageState` extends it
+      with the required `ticket`.
+    - Node names are `Final`, so `route_after_triage` returns their `Literal` types.
+    - `Workflow` alias: `CompiledStateGraph[TriageState, WorkflowContext, ...]`.
+    - `stream(..., version="v2")`: typed stream parts instead of untyped tuples.
+    - `Embedder` protocol with read-only properties, so the frozen dataclass fits.
+    - `fetch_one` raises if a query that always returns a row returns none.
+    - Two exceptions, both where the library has no real type: `cast(TriageState,
+      snapshot.values)` and `# type: ignore[no-untyped-call]` on TraceVerde.
+    - Tests are not type-checked yet.
 
 ## Docs
 

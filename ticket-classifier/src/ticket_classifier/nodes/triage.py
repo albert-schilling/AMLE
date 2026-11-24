@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from ..client import get_client
 from ..config import get_settings
-from ..models import TicketClassification, TriageState
+from ..models import TicketClassification, TriageState, TriageUpdate
 from ..prompts import SYSTEM_PROMPT, create_prompt
 
 
@@ -17,7 +17,9 @@ def ignore_event(event: Any) -> None:
     """Default stream writer: drop the event when the node runs outside a graph."""
 
 
-def node_triage(state: TriageState, writer: StreamWriter = ignore_event) -> TriageState:
+def node_triage(
+    state: TriageState, writer: StreamWriter = ignore_event
+) -> TriageUpdate:
     """Classify the ticket with one structured-output call to the model."""
     settings = get_settings()
     ticket = state["ticket"]
