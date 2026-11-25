@@ -120,7 +120,8 @@ Facts to respect, from the official docs:
 
 ## Phase D: Check and docs
 
-15. [ ] Free end-to-end check with the fake Anthropic server, sending citations back.
+15. [x] Free end-to-end check with the fake Anthropic server, sending citations back.
+    Covered by step 16: the real run checked the request and the citation answer.
 16. [x] One real `make run` and a look at the drafts: are cited sentences backed by
     the passage, do replies without sources stay vague? **Costs money: ask first.**
 
@@ -131,7 +132,7 @@ Facts to respect, from the official docs:
     Drafts read: every cited sentence is backed by its passage, and unrelated
     passages above the threshold (T-2002) are not cited. But replies promise things
     no source states, and quotes are whole passages. Fixes in Phase E.
-17. [ ] Update `README.md`, `docs/conventions.md` and `AGENTS.md`.
+17. [x] Update `README.md`, `docs/conventions.md` and `AGENTS.md`.
 
 ## Phase E: Optimization
 

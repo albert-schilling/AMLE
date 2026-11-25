@@ -4,8 +4,8 @@ Classifies support tickets into a category (`billing`, `technical`, `account`, `
 and a priority (`low`, `medium`, `high`) with Claude, as a LangGraph workflow:
 
 ```
-START → get_customer → retrieve_knowledge → triage → high priority? → human_review → END
-                                                             else → mark_handled → END
+START → get_customer → retrieve_knowledge → triage → draft_reply → high priority? → human_review → END
+                                                                          else → mark_handled → END
 ```
 
 - `get_customer` reads the customer from `CUSTOMERS_PATH` (if the ticket has an id).
@@ -13,6 +13,11 @@ START → get_customer → retrieve_knowledge → triage → high priority? → 
   text (see [Knowledge base](#knowledge-base)). `triage` gets them in the prompt.
 - `triage` makes one structured-output call to Claude. No classification (refusal,
   `max_tokens`) fails the ticket; the next run retries it.
+- `draft_reply` makes a second call and drafts a reply to the customer from the
+  passages, with the API's citations: `[1]` after each cited part and the sources at
+  the end. Without passages the reply cites nothing and states no policy. The draft
+  is never sent; a person does that. No usable reply fails the ticket; the next run
+  continues at `draft_reply` and keeps the saved classification.
 - `human_review` pauses the run until a person answers (see below).
 - Each ticket is its own thread; runs are saved in SQLite and survive a crash or exit.
 - Every workflow event (node update, pause, finish) is appended as one JSON line to
@@ -45,7 +50,8 @@ Calls the Anthropic API and may incur charges.
 A high-priority ticket pauses in `human_review` (`interrupt()`) and waits for a
 person. The run is saved in `CHECKPOINT_PATH` (SQLite, default `output/checkpoints.db`),
 so the process can exit. The run log shows what the reviewer needs (ticket, customer,
-classification, the policy passages triage saw) and the command to answer:
+classification, the policy passages triage saw, the draft reply) and the command to
+answer:
 
 ```sh
 uv run ticket-classifier resume T-3 --approve --note "Dana takes it"
@@ -55,7 +61,8 @@ make decline TICKET=T-3 NOTE="Bot can answer"
 ```
 
 A resume needs only the ticket id (the saved run has the ticket), finishes only that
-ticket, makes no model call and adds its result to
+ticket, makes no model call (the reply is drafted before the pause) and adds its
+result to
 `results.json` without removing the others. `--approve` gives `escalated: true` with
 the note as reason, `--decline` gives `escalated: false`. Paused tickets are not in
 `results.json` until they are answered; a normal run leaves them paused.
@@ -84,8 +91,14 @@ Customers are read from `CUSTOMERS_PATH` (JSON object keyed by customer id).
 
 ```json
 [{"ticket_id": "T-1", "customer_id": "1001", "category": "billing",
-  "priority": "high", "escalated": false, "escalation_reason": null}]
+  "priority": "high",
+  "reply": {"text": "... are refunded in full. [1]\n\nSources:\n[1] billing.md, part 4",
+            "citations": [{"source": "billing.md", "ordinal": 4,
+                           "quotes": ["... refunded in full."]}]},
+  "escalated": false, "escalation_reason": null}]
 ```
+
+`quotes` holds the `cited_text` the API returned for each citation.
 
 ## Knowledge base
 
@@ -105,14 +118,18 @@ make kb-eval                      # compare chunk settings on labelled questions
   changed.
 - `retrieve_knowledge` embeds the ticket text and takes the `KNOWLEDGE_TOP_K` closest
   chunks by cosine similarity (`<=>`, exact search). Passages below
-  `KNOWLEDGE_MIN_SCORE` are left out; the prompt says passages can be unrelated.
+  `KNOWLEDGE_MIN_SCORE` (default 0.65) are left out and only counted; the prompt
+  says passages can be unrelated.
 - Only `kb-index` may download the model (to `EMBEDDING_CACHE_PATH`); `run` loads it
   from there. Hugging Face telemetry is turned off.
-- Telemetry gets passage count, citations (`refunds.md#2`) and scores, never passage
-  or ticket text.
+- Telemetry gets passage and dropped counts, citations (`refunds.md#2`) and scores,
+  and for the reply its citation count and sources; never passage, ticket or reply
+  text.
 - `kb-eval` measures hit@1, hit@3 and mean reciprocal rank for vector search and
   PostgreSQL full-text search, on `data/eval/knowledge_questions.json`. Each setting
-  gets its own index; `run` keeps using the configured one.
+  gets its own index; `run` keeps using the configured one. It also compares minimum
+  scores (`--thresholds`): answers kept versus unanswerable questions left without
+  a passage.
 
 Results of the experiments (chunk sizes, minimum score, column types, full-text
 search, HNSW): [docs/exercises/plan_w9d1.md](docs/exercises/plan_w9d1.md).
@@ -137,7 +154,8 @@ Dashboards (user `admin`): [metrics](http://localhost:3000/d/ticket-classifier),
 ## Configuration
 
 Environment variables or `.env`, see [.env.example](.env.example):
-`ANTHROPIC_API_KEY` (required for `run`), `MODEL`, `MAX_TOKENS`, `LOG_LEVEL`, `LOG_FILE`,
+`ANTHROPIC_API_KEY` (required for `run`), `MODEL`, `MAX_TOKENS`, `REPLY_MODEL`
+(default: `MODEL`), `REPLY_MAX_TOKENS`, `LOG_LEVEL`, `LOG_FILE`,
 `TRACE_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`,
 `CHECKPOINT_PATH`, `GRAPH_PATH`.
 
@@ -163,12 +181,13 @@ OpenTelemetry (off by default): `OTEL_ENABLED`, `OTEL_SERVICE_NAME`,
 | `context.py` | runtime context of a run (the knowledge base), not saved in checkpoints |
 | `knowledge/` | `documents.py`, `chunking.py`, `embedder.py` (fastembed), `store.py` (PostgreSQL), `evaluation.py` (kb-eval) |
 | `nodes/` | one file per node, the router, the node names |
-| `prompts.py`, `client.py` | system prompt and user message, Anthropic client |
+| `prompts.py`, `client.py` | system prompts and user messages (triage, reply), Anthropic client |
+| `replies.py` | build the `Reply` from the API answer: citation numbers, markers, source list |
 | `customers.py` | customer data access (swap for a DB later) |
 | `storage.py` | read tickets, write or merge results |
 | `trace.py`, `logging_config.py` | JSON lines trace, logger setup |
 | `telemetry.py` | OpenTelemetry: settings to the SDK, start TraceVerde, send our logs |
-| `models/` | data only: `domain.py` (input), `state.py` (graph state), `results.py` (output rows), `knowledge.py` (chunks, passages, labelled questions) |
+| `models/` | data only: `domain.py` (input), `state.py` (graph state), `results.py` (output rows), `knowledge.py` (chunks, passages, retrieval result, labelled questions), `reply.py` (draft reply, citations) |
 | `config.py` | settings |
 
 ## Development

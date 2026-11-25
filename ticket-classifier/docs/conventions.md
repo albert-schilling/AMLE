@@ -34,6 +34,9 @@ Write clean code for humans: code a reader understands on the first pass.
 - A new type in the graph state joins `CHECKPOINT_TYPES`, or it loads back as a plain
   dict.
 - A `Protocol` lives with the code that uses it, not with the code that implements it.
+- API citations and structured outputs cannot be combined (400 error). A call with
+  citations uses `messages.create` without an output format, and our code builds the
+  model from the answer.
 
 ## Logging
 
@@ -41,7 +44,8 @@ Write clean code for humans: code a reader understands on the first pass.
   `safe_log` also sends the line to Loki.
 - Use `safe_log` only for ids, counts and labels: never file paths or ticket, customer,
   reviewer or error text. Policy passages: citations (`refunds.md#2`) and scores only,
-  never their text or the query.
+  never their text or the query. Replies: citation counts and sources only, never the
+  text or the quotes.
 - For a caught error, log its type with `safe_log` and the full error with `logger`.
 
 ## Types
@@ -70,7 +74,9 @@ treats `_name` in a model as a private attribute).
 ## Tests
 
 - Test behaviour: run the real graph (`InMemorySaver` or a SQLite file in `tmp_path`)
-  and mock only the model, with the `model` fixture from `conftest.py`.
+  and mock only the model, with the `model` fixture from `conftest.py` (it brings
+  `reply_api` for the reply call; set `reply_api.return_value` to `reply_message(...)`
+  for a reply with citations).
 - Test behaviour, not the code's shape: a test must be able to fail when our code is
   wrong. No tests of constants, declarations, defaults or pydantic itself.
 - Never import from `conftest.py`; shared test data goes in `tests/helpers.py`.
