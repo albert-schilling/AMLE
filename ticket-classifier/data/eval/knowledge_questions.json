@@ -14,5 +14,11 @@
   {"id": "Q-13", "question": "I never got the email to set a new password.", "source": "accounts.md", "answer": "check their spam folder"},
   {"id": "Q-14", "question": "Can you combine my two accounts into one?", "source": "accounts.md", "answer": "cannot merge two separate accounts"},
   {"id": "Q-15", "question": "What are the opening hours of your store in Berlin?", "source": null, "answer": null},
-  {"id": "Q-16", "question": "Do you offer gift wrapping?", "source": null, "answer": null}
+  {"id": "Q-16", "question": "Do you offer gift wrapping?", "source": null, "answer": null},
+  {"id": "Q-17", "question": "Can I pay with PayPal?", "source": null, "answer": null},
+  {"id": "Q-18", "question": "Do you have a loyalty or rewards program?", "source": null, "answer": null},
+  {"id": "Q-19", "question": "Is there a discount for students?", "source": null, "answer": null},
+  {"id": "Q-20", "question": "Can I change the delivery address after I ordered?", "source": null, "answer": null},
+  {"id": "Q-21", "question": "Where is your company headquartered?", "source": null, "answer": null},
+  {"id": "Q-22", "question": "Do you sell gift cards?", "source": null, "answer": null}
 ]

@@ -9,7 +9,13 @@ from ticket_classifier.models import (
 )
 
 RESULT = TypeAdapter(ClassifiedTicket)
-FIELDS = {"ticket_id": "T-1", "category": "billing", "priority": "high"}
+REPLY = {"text": "Hi", "citations": []}
+FIELDS = {
+    "ticket_id": "T-1",
+    "category": "billing",
+    "priority": "high",
+    "reply": REPLY,
+}
 
 
 def test_classification_rejects_extra_fields():
@@ -27,11 +33,17 @@ def test_result_union_picks_the_type_from_escalated():
 
 NO_REASON = {**FIELDS, "escalated": True}
 REASON_BUT_NOT_ESCALATED = {**FIELDS, "escalated": False, "escalation_reason": "x"}
-NO_CLASSIFICATION = {"ticket_id": "T-1", "escalated": True, "escalation_reason": "x"}
+NO_CLASSIFICATION = {
+    "ticket_id": "T-1",
+    "reply": REPLY,
+    "escalated": True,
+    "escalation_reason": "x",
+}
+NO_REPLY = {"ticket_id": "T-1", "category": "billing", "priority": "low"}
 
 
 @pytest.mark.parametrize(
-    "row", [NO_REASON, REASON_BUT_NOT_ESCALATED, NO_CLASSIFICATION]
+    "row", [NO_REASON, REASON_BUT_NOT_ESCALATED, NO_CLASSIFICATION, NO_REPLY]
 )
 def test_impossible_results_are_rejected(row):
     with pytest.raises(ValidationError):

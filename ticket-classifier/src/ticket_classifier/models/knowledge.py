@@ -32,6 +32,19 @@ class KnowledgePassage(BaseModel):
         return f"{self.source}#{self.ordinal}"
 
 
+class RetrievalResult(BaseModel):
+    """The policy passages for one ticket, after the confidence threshold."""
+
+    passages: list[KnowledgePassage]  # at or above min_score, best first
+    min_score: float  # the threshold used, KNOWLEDGE_MIN_SCORE at retrieval time
+    dropped: int  # found, but below min_score
+
+    @property
+    def has_sources(self) -> bool:
+        """False: nothing passed the threshold, so the reply cites no policy."""
+        return bool(self.passages)
+
+
 class EvalQuestion(BaseModel):
     """A question with the document that answers it and a phrase of the answer.
 

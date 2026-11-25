@@ -1,5 +1,5 @@
 import pytest
-from helpers import HIGH, REFUND_PASSAGE
+from helpers import HIGH, REFUND_PASSAGE, reply_message
 from pydantic import ValidationError
 
 from ticket_classifier.cli import main
@@ -83,6 +83,42 @@ def test_ticket_span_has_policy_citations_and_top_score(
     assert span.attributes["knowledge.passages"] == 2
     assert span.attributes["knowledge.sources"] == ("refunds.md#1", "refunds.md#2")
     assert span.attributes["knowledge.top_score"] == 0.9
+
+
+def test_ticket_span_counts_passages_below_the_minimum_score(
+    model, knowledge, write_tickets, finished_spans
+):
+    weak = REFUND_PASSAGE.model_copy(update={"ordinal": 2, "score": 0.1})
+    knowledge.passages = [REFUND_PASSAGE, weak]
+    main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))])
+
+    (span,) = by_name(finished_spans(), "ticket.run")
+    assert span.attributes["knowledge.passages"] == 1
+    assert span.attributes["knowledge.dropped"] == 1
+
+
+def test_ticket_span_has_reply_citations(
+    model, reply_api, write_tickets, finished_spans
+):
+    reply_api.return_value = reply_message(
+        {"text": "Refunds take 5 days.", "cited": [(0, "5 days")]}
+    )
+    main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))])
+
+    (span,) = by_name(finished_spans(), "ticket.run")
+    assert span.attributes["reply.citations"] == 1
+    assert span.attributes["reply.sources"] == ("refunds.md#1",)
+    assert span.attributes["reply.has_sources"] is True
+
+
+def test_ticket_span_marks_a_reply_without_sources(
+    model, write_tickets, finished_spans
+):
+    main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))])
+
+    (span,) = by_name(finished_spans(), "ticket.run")
+    assert span.attributes["reply.citations"] == 0
+    assert span.attributes["reply.has_sources"] is False
 
 
 def test_ticket_span_without_passages_has_no_top_score(
@@ -195,10 +231,13 @@ def test_only_a_run_without_work_is_marked_reused(model, write_tickets, finished
     assert second.attributes["ticket.status"] == "finished"
 
 
-def test_spans_hold_no_ticket_customer_or_policy_text(
-    model, knowledge, write_tickets, finished_spans
+def test_spans_hold_no_ticket_customer_policy_or_reply_text(
+    model, knowledge, reply_api, write_tickets, finished_spans
 ):
     knowledge.passages = [PRIVATE_PASSAGE]
+    reply_api.return_value = reply_message(
+        {"text": "private reply text", "cited": [(0, "private policy text")]}
+    )
     model.outcomes["private urgent text"] = HIGH
     model.outcomes["private broken text"] = None
     tickets = write_tickets(
@@ -216,6 +255,7 @@ def test_spans_hold_no_ticket_customer_or_policy_text(
         "private broken",
         "private reviewer",
         "private policy",
+        "private reply",
         "alice",
     )
     for private in private_texts:

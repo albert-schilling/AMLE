@@ -42,8 +42,17 @@ def test_kb_eval_compares_every_size_with_every_overlap_by_default():
 def test_kb_eval_skips_overlaps_not_smaller_than_the_size():
     args = parse_args(["kb-eval", "--sizes", "10", "20", "--overlaps", "0", "10"])
 
-    assert args == KbEvalArgs(sizes=[10, 20], overlaps=[0, 10])
+    assert args == KbEvalArgs(
+        sizes=[10, 20], overlaps=[0, 10], thresholds=[0.5, 0.55, 0.6, 0.65, 0.7]
+    )
     assert args.chunk_settings == [(10, 0), (20, 0), (20, 10)]
+
+
+def test_kb_eval_takes_thresholds():
+    assert parse_args(["kb-eval", "--thresholds", "0.6", "-0.1"]).thresholds == [
+        0.6,
+        -0.1,
+    ]
 
 
 def test_resume_note_defaults_to_empty():
@@ -60,6 +69,7 @@ def test_resume_note_defaults_to_empty():
         ["kb-index", "extra"],
         ["kb-eval", "--sizes", "0"],
         ["kb-eval", "--overlaps", "-1"],
+        ["kb-eval", "--thresholds", "1.5"],
         ["kb-eval", "--sizes", "10", "--overlaps", "10"],  # nothing left to compare
     ],
 )

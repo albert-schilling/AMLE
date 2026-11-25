@@ -12,6 +12,7 @@ from ticket_classifier.knowledge.evaluation import (
     answer_rank,
     answers,
     compare_chunk_settings,
+    compare_thresholds,
     load_questions,
     measure,
     normalize,
@@ -125,3 +126,27 @@ def test_each_chunk_setting_gets_its_own_index(knowledge_db):
 
 def index_count(connection):
     return connection.execute("SELECT count(*) FROM knowledge_indexes").fetchone()[0]
+
+
+def test_thresholds_count_kept_answers_and_questions_left_without_passages():
+    def search(query, k):
+        weak = passage("billing.md", "x").model_copy(update={"score": 0.55})
+        if query == "answerable":
+            return [weak, passage("refunds.md", "within 30 days")]  # answer at 0.8
+        return [weak]
+
+    questions = [
+        EvalQuestion(id="Q-1", question="answerable", source="refunds.md", answer="30"),
+        EvalQuestion(id="Q-2", question="other", source=None, answer=None),
+    ]
+
+    low, middle, high = compare_thresholds(search, questions, [0.5, 0.6, 0.9])
+
+    assert (low.answer_kept, low.unanswerable_unsourced) == (1, 0)
+    assert (middle.answer_kept, middle.unanswerable_unsourced) == (1, 1)
+    assert (high.answer_kept, high.answerable_unsourced) == (0, 1)
+
+
+def test_thresholds_need_both_kinds_of_questions():
+    with pytest.raises(ValueError, match="answerable and unanswerable"):
+        compare_thresholds(FakeKnowledge().search, [question()], [0.5])

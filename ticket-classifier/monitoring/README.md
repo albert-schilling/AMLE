@@ -44,7 +44,7 @@ Three dashboards, linked at the top of each:
 | Dashboard | Shows |
 | --- | --- |
 | [Ticket Classifier](http://localhost:3000/d/ticket-classifier) | metrics: tickets, latency, tokens, cost |
-| [Traces](http://localhost:3000/d/ticket-classifier-traces) | ticket runs, paused and failed tickets, slow model calls, weak policy matches (threshold in the `weak_score` box) |
+| [Traces](http://localhost:3000/d/ticket-classifier-traces) | ticket runs, paused and failed tickets, slow model calls, weak policy matches (threshold in the `weak_score` box), replies without sources |
 | [Logs](http://localhost:3000/d/ticket-classifier-logs) | log volume and lines, by ticket or search text |
 
 To jump between signals:
@@ -83,14 +83,20 @@ this stack; some return nothing until a run produces a match.
 # Policy passages per ticket
 {resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.knowledge.passages > 0} | select(span.ticket_id, span.knowledge.top_score, span.knowledge.sources)
 
-# Weak policy matches (best passage below 0.65)
-{resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.knowledge.top_score < 0.65} | select(span.ticket_id, span.knowledge.top_score, span.knowledge.sources)
+# Weak policy matches (best passage passed the 0.65 minimum, but is below 0.7)
+{resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.knowledge.top_score < 0.7} | select(span.ticket_id, span.knowledge.top_score, span.knowledge.sources)
 
 # Tickets without policy passages
 {resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.knowledge.passages = 0} | select(span.ticket_id, span.category, span.priority)
 
 # Tickets that got one policy part (matches any element of the list)
 {resource.service.name="ticket-classifier" && span.knowledge.sources = "warranty.md#3"} | select(span.ticket_id, span.knowledge.sources)
+
+# Replies without sources
+{resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.reply.has_sources = false} | select(span.ticket_id, span.knowledge.passages, span.knowledge.dropped)
+
+# Replies that cite one policy part
+{resource.service.name="ticket-classifier" && span.reply.sources = "refunds.md#1"} | select(span.ticket_id, span.reply.citations, span.reply.sources)
 
 # Retrieval steps over 100 ms
 {resource.service.name="ticket-classifier" && name="langgraph.node.retrieve_knowledge" && duration > 100ms}
@@ -253,10 +259,14 @@ flowchart LR
   traced. Their time is inside the `langgraph.node.retrieve_knowledge` span.
 
 - **Status:** ticket spans have `ticket.status` (`finished`, `paused`, `failed`).
-- **Knowledge:** ticket spans have `knowledge.passages` (count), `knowledge.sources`
-  (citations such as `refunds.md#2`, best first) and `knowledge.top_score` (cosine
-  similarity of the best passage; missing without passages). They are read from the
-  saved state, so a reused run has them too.
+- **Knowledge:** ticket spans have `knowledge.passages` (count), `knowledge.dropped`
+  (found, but below `KNOWLEDGE_MIN_SCORE`), `knowledge.sources` (citations such as
+  `refunds.md#2`, best first) and `knowledge.top_score` (cosine similarity of the
+  best passage; missing without passages). They are read from the saved state, so a
+  reused run has them too.
+- **Reply:** ticket spans have `reply.citations` (count), `reply.sources` (the cited
+  passages, in order of first use) and `reply.has_sources`. Never the reply text or
+  the quotes.
 - **Pauses:** a ticket waiting for a human has `ticket.status=paused` on its span,
   and a `paused` event when the run stops. It is not an error.
 - **Stored:** Tempo first writes spans to a write-ahead log (WAL), then packs them into

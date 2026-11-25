@@ -9,8 +9,9 @@ from .context import WorkflowContext
 from .graph import build_workflow, write_mermaid
 from .knowledge.documents import load_documents
 from .knowledge.evaluation import (
-    ChunkSettingResult,
+    KnowledgeEvaluation,
     compare_chunk_settings,
+    compare_thresholds,
     load_questions,
 )
 from .knowledge.store import BuildResult, open_knowledge_base
@@ -113,10 +114,13 @@ def index_knowledge(settings: Settings) -> BuildResult:
     return result
 
 
-def evaluate_chunk_settings(
-    settings: Settings, chunk_settings: Sequence[tuple[int, int]]
-) -> list[ChunkSettingResult]:
-    """Search the labelled questions with an index per (size, overlap).
+def evaluate_knowledge(
+    settings: Settings,
+    chunk_settings: Sequence[tuple[int, int]],
+    thresholds: Sequence[float],
+) -> KnowledgeEvaluation:
+    """Search the labelled questions with an index per (size, overlap), and compare
+    minimum scores on the configured chunk setting.
 
     Builds missing indexes with the local model; changes nothing for ``run``, which
     keeps using the chunk setting from the settings.
@@ -126,6 +130,8 @@ def evaluate_chunk_settings(
 
     with open_knowledge_base(settings) as knowledge:
         results = compare_chunk_settings(knowledge, docs, questions, chunk_settings)
+        knowledge.build(docs)  # the configured index; skipped if unchanged
+        threshold_results = compare_thresholds(knowledge.search, questions, thresholds)
 
     for result in results:
         safe_log.info(
@@ -136,4 +142,13 @@ def evaluate_chunk_settings(
             result.vector.mean_reciprocal_rank,
             result.keyword.mean_reciprocal_rank,
         )
-    return results
+    for threshold in threshold_results:
+        safe_log.info(
+            "Min score %.2f: answer kept %.2f, answerable without passage %.2f, "
+            "unanswerable without passage %.2f",
+            threshold.min_score,
+            threshold.answer_kept,
+            threshold.answerable_unsourced,
+            threshold.unanswerable_unsourced,
+        )
+    return KnowledgeEvaluation(results, threshold_results)

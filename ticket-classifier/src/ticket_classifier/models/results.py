@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from .domain import Category, Priority
+from .reply import Reply
 
 
 class TicketResult(BaseModel):
@@ -14,6 +15,7 @@ class TicketResult(BaseModel):
     customer_id: str | None = None
     category: Category
     priority: Priority
+    reply: Reply  # draft for a person to send, with its cited sources
 
 
 class ResolvedTicket(TicketResult):

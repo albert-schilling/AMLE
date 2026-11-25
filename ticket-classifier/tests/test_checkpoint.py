@@ -8,7 +8,14 @@ from ticket_classifier.checkpoint import (
     run_status,
     thread_config,
 )
-from ticket_classifier.models import KnowledgePassage, Ticket, TicketClassification
+from ticket_classifier.models import (
+    Citation,
+    KnowledgePassage,
+    Reply,
+    RetrievalResult,
+    Ticket,
+    TicketClassification,
+)
 
 
 def test_open_checkpointer_creates_the_file(tmp_path):
@@ -45,6 +52,10 @@ def test_escalation_request_with_models_survives_the_serializer():
         "policies": [
             KnowledgePassage(source="refunds.md", ordinal=1, text="5 days", score=0.9)
         ],
+        "reply": Reply(
+            text="Refunds take 5 days. [1]",
+            citations=[Citation(source="refunds.md", ordinal=1, quotes=["5 days"])],
+        ),
     }
 
     assert (
@@ -52,12 +63,22 @@ def test_escalation_request_with_models_survives_the_serializer():
     )
 
 
-def test_knowledge_passages_survive_the_serializer():
+def test_retrieval_result_and_reply_survive_the_serializer():
     state = {
         "ticket": Ticket(id="T-1", text="x"),
-        "knowledge": [
-            KnowledgePassage(source="refunds.md", ordinal=1, text="5 days", score=0.9)
-        ],
+        "retrieval": RetrievalResult(
+            passages=[
+                KnowledgePassage(
+                    source="refunds.md", ordinal=1, text="5 days", score=0.9
+                )
+            ],
+            min_score=0.5,
+            dropped=2,
+        ),
+        "reply": Reply(
+            text="Refunds take 5 days. [1]",
+            citations=[Citation(source="refunds.md", ordinal=1, quotes=["5 days"])],
+        ),
     }
 
     assert CHECKPOINT_SERDE.loads_typed(CHECKPOINT_SERDE.dumps_typed(state)) == state

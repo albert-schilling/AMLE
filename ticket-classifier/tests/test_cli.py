@@ -5,7 +5,12 @@ from ticket_classifier.cli import main
 from ticket_classifier.commands import MissingApiKeyError
 from ticket_classifier.knowledge.documents import NoDocumentsError
 from ticket_classifier.knowledge.embedder import EmbeddingModelMissingError
-from ticket_classifier.knowledge.evaluation import ChunkSettingResult, SearchQuality
+from ticket_classifier.knowledge.evaluation import (
+    ChunkSettingResult,
+    KnowledgeEvaluation,
+    SearchQuality,
+    ThresholdResult,
+)
 from ticket_classifier.knowledge.store import (
     KnowledgeDatabaseNotConfiguredError,
     KnowledgeIndexMissingError,
@@ -130,24 +135,29 @@ def test_kb_index_returns_2_when_documents_or_database_are_missing(
 
 @pytest.fixture
 def evaluate(mocker):
-    return mocker.patch("ticket_classifier.cli.commands.evaluate_chunk_settings")
+    return mocker.patch("ticket_classifier.cli.commands.evaluate_knowledge")
 
 
-def test_kb_eval_prints_the_table(evaluate, capsys):
-    evaluate.return_value = [
-        ChunkSettingResult(
-            30,
-            0,
-            40,
-            vector=SearchQuality(0.5, 0.75, 0.6),
-            keyword=SearchQuality(0.25, 0.5, 0.3),
-        )
-    ]
+def test_kb_eval_prints_both_tables(evaluate, capsys):
+    evaluate.return_value = KnowledgeEvaluation(
+        chunk_settings=[
+            ChunkSettingResult(
+                30,
+                0,
+                40,
+                vector=SearchQuality(0.5, 0.75, 0.6),
+                keyword=SearchQuality(0.25, 0.5, 0.3),
+            )
+        ],
+        thresholds=[ThresholdResult(0.6, 0.9, 0.05, 0.5)],
+    )
 
-    assert main(["kb-eval", "--sizes", "30", "--overlaps", "0"]) == 0
-    assert evaluate.call_args.args[1] == [(30, 0)]
+    argv = ["kb-eval", "--sizes", "30", "--overlaps", "0", "--thresholds", "0.6"]
+    assert main(argv) == 0
+    assert evaluate.call_args.args[1:] == ([(30, 0)], [0.6])
     out = capsys.readouterr().out
     assert "| 30 | 0 | 40 | 0.50 | 0.75 | 0.60 | 0.25 | 0.50 | 0.30 |" in out
+    assert "| 0.60 | 0.90 | 0.05 | 0.50 |" in out
 
 
 @pytest.mark.parametrize(

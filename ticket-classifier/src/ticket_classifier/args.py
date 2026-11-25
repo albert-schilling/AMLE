@@ -29,6 +29,7 @@ class KbEvalArgs:
 
     sizes: list[int]
     overlaps: list[int]
+    thresholds: list[float]  # minimum scores to compare
 
     def __post_init__(self) -> None:
         if not self.chunk_settings:
@@ -66,7 +67,11 @@ def parse_args(argv: list[str] | None = None) -> Args:
             case "kb-index":
                 return KbIndexArgs()
             case "kb-eval":
-                return KbEvalArgs(sizes=namespace.sizes, overlaps=namespace.overlaps)
+                return KbEvalArgs(
+                    sizes=namespace.sizes,
+                    overlaps=namespace.overlaps,
+                    thresholds=namespace.thresholds,
+                )
     except ValueError as error:
         parser.error(str(error))  # exits with code 2, like other bad arguments
 
@@ -132,6 +137,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=[0, 10, 20],
         help="overlaps in words; skipped where not smaller than the size",
     )
+    kb_eval.add_argument(
+        "--thresholds",
+        nargs="+",
+        type=cosine,
+        default=[0.5, 0.55, 0.6, 0.65, 0.7],
+        help="minimum scores to compare on the configured chunk setting",
+    )
 
     return parser
 
@@ -147,4 +159,11 @@ def non_negative_int(text: str) -> int:
     value = int(text)
     if value < 0:
         raise argparse.ArgumentTypeError(f"must not be negative: {value}")
+    return value
+
+
+def cosine(text: str) -> float:
+    value = float(text)
+    if not -1 <= value <= 1:
+        raise argparse.ArgumentTypeError(f"must be between -1 and 1: {value}")
     return value

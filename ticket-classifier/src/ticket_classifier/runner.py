@@ -20,6 +20,7 @@ from .models import (
     TriageState,
 )
 from .nodes import TriageError
+from .replies import ReplyError
 from .telemetry import (
     get_loggers,
     record_failure,
@@ -54,7 +55,7 @@ def run_all(
         with ticket_span(ticket.id, "run"):
             try:
                 result = run_ticket(workflow, context, ticket)
-            except (APIError, TriageError) as error:
+            except (APIError, TriageError, ReplyError) as error:
                 batch.failed.append(ticket.id)
                 safe_log.error("Ticket %s failed: %s", ticket.id, type(error).__name__)
                 logger.error("Ticket %s error detail: %s", ticket.id, error)
@@ -186,12 +187,14 @@ def to_classified_ticket(result: TriageState) -> ClassifiedTicket:
     escalation = result["escalation"]
     ticket_id = result["ticket"].id
     customer_id = result["customer"].id if result["customer"] else None
+    reply = result["reply"]
     if isinstance(escalation, Escalated):
         return EscalatedTicket(
             ticket_id=ticket_id,
             customer_id=customer_id,
             category=classification.category,
             priority=classification.priority,
+            reply=reply,
             escalation_reason=escalation.escalation_reason,
         )
     return ResolvedTicket(
@@ -199,4 +202,5 @@ def to_classified_ticket(result: TriageState) -> ClassifiedTicket:
         customer_id=customer_id,
         category=classification.category,
         priority=classification.priority,
+        reply=reply,
     )

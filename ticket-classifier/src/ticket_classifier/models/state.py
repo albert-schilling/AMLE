@@ -5,7 +5,8 @@ from typing import Annotated, Literal, TypedDict
 from pydantic import BaseModel, Field
 
 from .domain import Customer, Ticket, TicketClassification
-from .knowledge import KnowledgePassage
+from .knowledge import KnowledgePassage, RetrievalResult
+from .reply import Reply
 
 
 class NotEscalated(BaseModel):
@@ -24,8 +25,9 @@ class TriageUpdate(TypedDict, total=False):
     """What a node returns: only the keys it writes. All keys may be missing."""
 
     customer: Customer | None  # None: no id, unknown, or unreadable
-    knowledge: list[KnowledgePassage]  # policy passages for the ticket, best first
+    retrieval: RetrievalResult  # policy passages for the ticket, best first
     classification: TicketClassification
+    reply: Reply  # draft with cited policies, for a person to send
     escalation: Escalation
 
 
@@ -47,6 +49,7 @@ class EscalationRequest(TypedDict):
     customer: Customer | None
     classification: TicketClassification
     policies: list[KnowledgePassage]  # the passages triage saw, best first
+    reply: Reply  # the draft; its citations name the policies it uses
 
 
 class HumanAnswer(TypedDict):

@@ -1,7 +1,7 @@
-from helpers import REFUND_PASSAGE
+from helpers import HIGH, REFUND_PASSAGE
 
 from ticket_classifier.models import Customer, KnowledgePassage
-from ticket_classifier.prompts import create_prompt
+from ticket_classifier.prompts import create_prompt, reply_content
 
 ALICE = Customer(
     id="1001",
@@ -46,3 +46,25 @@ def test_policies_come_before_the_ticket_with_their_source(make_ticket):
     )
     assert '<policy source="shipping.md" part="0">' in before_ticket
     assert "policy" not in after_ticket
+
+
+def test_reply_content_puts_passages_as_search_results_and_the_ticket_last(
+    make_ticket,
+):
+    blocks = reply_content(
+        make_ticket(text="Where is my refund?"), None, HIGH, [REFUND_PASSAGE]
+    )
+
+    intro, policy, ticket = blocks
+    assert "billing, high" in intro["text"]
+    assert policy["type"] == "search_result"
+    assert policy["source"] == "refunds.md#1"
+    assert policy["citations"] == {"enabled": True}
+    assert policy["content"] == [{"type": "text", "text": REFUND_PASSAGE.text}]
+    assert ticket["text"] == "<ticket>\nWhere is my refund?\n</ticket>"
+
+
+def test_reply_content_without_passages_has_no_search_results(make_ticket):
+    blocks = reply_content(make_ticket(), None, HIGH, [])
+
+    assert [block["type"] for block in blocks] == ["text", "text"]

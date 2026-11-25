@@ -7,7 +7,7 @@ from .args import KbEvalArgs, KbIndexArgs, ResumeArgs, RunArgs, parse_args
 from .config import Settings, get_settings
 from .knowledge.documents import NoDocumentsError
 from .knowledge.embedder import EmbeddingModelMissingError
-from .knowledge.evaluation import results_table
+from .knowledge.evaluation import results_table, thresholds_table
 from .knowledge.store import (
     KnowledgeDatabaseNotConfiguredError,
     KnowledgeIndexMissingError,
@@ -106,9 +106,12 @@ def handle_kb_index(settings: Settings) -> int:
 
 
 def handle_kb_eval(args: KbEvalArgs, settings: Settings) -> int:
-    """Compare chunk settings and print the table; 2 if an input is missing."""
+    """Compare chunk settings and thresholds, print the tables; 2 if an input is
+    missing."""
     try:
-        results = commands.evaluate_chunk_settings(settings, args.chunk_settings)
+        evaluation = commands.evaluate_knowledge(
+            settings, args.chunk_settings, args.thresholds
+        )
     except (
         OSError,
         ValidationError,
@@ -120,7 +123,13 @@ def handle_kb_eval(args: KbEvalArgs, settings: Settings) -> int:
         return 2
     except psycopg.OperationalError as error:
         return database_unreachable(error)
-    print(results_table(results))
+    print("Chunk settings\n")
+    print(results_table(evaluation.chunk_settings))
+    print(
+        f"\nMinimum scores, chunk size {settings.chunk_size}, "
+        f"overlap {settings.chunk_overlap}\n"
+    )
+    print(thresholds_table(evaluation.thresholds))
     return 0
 
 

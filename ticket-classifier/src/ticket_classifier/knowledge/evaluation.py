@@ -38,6 +38,22 @@ class ChunkSettingResult:
     keyword: SearchQuality  # PostgreSQL full-text search
 
 
+@dataclass(frozen=True)
+class ThresholdResult:
+    """What a minimum score does to the top three passages of each question."""
+
+    min_score: float
+    answer_kept: float  # answerable questions whose answer is kept: higher is better
+    answerable_unsourced: float  # answerable questions left with no passage at all
+    unanswerable_unsourced: float  # unanswerable ones left with none: higher is better
+
+
+@dataclass(frozen=True)
+class KnowledgeEvaluation:
+    chunk_settings: list[ChunkSettingResult]
+    thresholds: list[ThresholdResult]  # on the configured chunk setting
+
+
 def load_questions(path: Path) -> list[EvalQuestion]:
     return QUESTIONS.validate_json(path.read_bytes())
 
@@ -104,6 +120,55 @@ def compare_chunk_settings(
             )
         )
     return results
+
+
+def compare_thresholds(
+    search: Search, questions: Sequence[EvalQuestion], thresholds: Sequence[float]
+) -> list[ThresholdResult]:
+    """Search each question once, then apply each minimum score to its passages."""
+    answerable = [q for q in questions if q.answerable]
+    unanswerable = [q for q in questions if not q.answerable]
+    if not answerable or not unanswerable:
+        raise ValueError("thresholds need answerable and unanswerable questions")
+    found = {q.id: search(q.question, TOP_K) for q in questions}
+
+    def kept(question: EvalQuestion, min_score: float) -> list[KnowledgePassage]:
+        return [p for p in found[question.id] if p.score >= min_score]
+
+    def share(group: Sequence[EvalQuestion], count: int) -> float:
+        return count / len(group)
+
+    return [
+        ThresholdResult(
+            min_score=min_score,
+            answer_kept=share(
+                answerable,
+                sum(answer_rank(q, kept(q, min_score)) > 0 for q in answerable),
+            ),
+            answerable_unsourced=share(
+                answerable, sum(not kept(q, min_score) for q in answerable)
+            ),
+            unanswerable_unsourced=share(
+                unanswerable, sum(not kept(q, min_score) for q in unanswerable)
+            ),
+        )
+        for min_score in thresholds
+    ]
+
+
+def thresholds_table(results: Sequence[ThresholdResult]) -> str:
+    """A Markdown table, one row per minimum score, lowest first."""
+    rows = [
+        "| Min score | Answer kept | Answerable, no passage "
+        "| Unanswerable, no passage |",
+        "| ---: | ---: | ---: | ---: |",
+    ]
+    for r in sorted(results, key=lambda r: r.min_score):
+        rows.append(
+            f"| {r.min_score:.2f} | {r.answer_kept:.2f} "
+            f"| {r.answerable_unsourced:.2f} | {r.unanswerable_unsourced:.2f} |"
+        )
+    return "\n".join(rows)
 
 
 def results_table(results: Sequence[ChunkSettingResult]) -> str:

@@ -3,7 +3,7 @@ import os
 
 import psycopg
 import pytest
-from helpers import LOW, FakeKnowledge
+from helpers import LOW, FakeKnowledge, reply_message
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -91,10 +91,23 @@ def workflow_context(knowledge):
 
 
 @pytest.fixture
-def model(mocker, customers_file, knowledge):
+def reply_api(mocker):
+    """Mock the reply call: ``messages.create`` answers ``reply_message()``.
+
+    Set ``reply_api.return_value`` for another answer.
+    """
+    client = mocker.patch("ticket_classifier.nodes.draft_reply.get_client")
+    create = client.return_value.messages.create
+    create.return_value = reply_message()
+    return create
+
+
+@pytest.fixture
+def model(mocker, customers_file, knowledge, reply_api):
     """Mock the triage call; returns the mocked ``parse`` to count calls.
 
-    Every graph run needs the knowledge base too, so this brings the fake one.
+    Every graph run needs the knowledge base and the reply call too, so this brings
+    their fakes.
 
     The ticket text picks the outcome via ``model.outcomes[text]``, default ``LOW``.
     An outcome is a classification, None (no parsed output) or an exception.

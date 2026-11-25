@@ -2,7 +2,7 @@
 
 import anthropic
 import pytest
-from helpers import HIGH, LOW, REFUND_PASSAGE
+from helpers import HIGH, LOW, REFUND_PASSAGE, REPLY, reply_message
 from langgraph.checkpoint.memory import InMemorySaver
 
 from ticket_classifier.checkpoint import thread_config
@@ -30,8 +30,26 @@ def test_low_priority_ticket_is_handled_automatically(
     )
 
     assert to_classified_ticket(result) == ResolvedTicket(
-        ticket_id="T-1", customer_id="1001", category="billing", priority="low"
+        ticket_id="T-1",
+        customer_id="1001",
+        category="billing",
+        priority="low",
+        reply=REPLY,
     )
+
+
+def test_result_has_the_reply_with_its_sources(
+    workflow_context, model, reply_api, workflow, make_ticket
+):
+    reply_api.return_value = reply_message(
+        {"text": "Refunds take 5 days.", "cited": [(0, "5 days")]}
+    )
+
+    result = run_ticket(workflow, workflow_context, make_ticket(id="T-1"))
+
+    reply = to_classified_ticket(result).reply
+    assert [c.citation for c in reply.citations] == [REFUND_PASSAGE.citation]
+    assert reply.text.endswith(f"[1] {REFUND_PASSAGE.source}, part 1")
 
 
 def test_high_priority_ticket_pauses_for_a_human(
@@ -51,6 +69,7 @@ def test_high_priority_ticket_pauses_for_a_human(
     assert request["customer"].first_name == "Alice"
     assert request["classification"] == HIGH
     assert request["policies"] == [REFUND_PASSAGE]
+    assert request["reply"] == REPLY
 
 
 def test_paused_ticket_stays_paused_on_the_next_run(
@@ -74,13 +93,18 @@ def test_paused_ticket_stays_paused_on_the_next_run(
                 customer_id="1001",
                 category="billing",
                 priority="high",
+                reply=REPLY,
                 escalation_reason="Dana takes it",
             ),
         ),
         (
             {"approved": False, "note": "Bot can answer"},
             ResolvedTicket(
-                ticket_id="T-1", customer_id="1001", category="billing", priority="high"
+                ticket_id="T-1",
+                customer_id="1001",
+                category="billing",
+                priority="high",
+                reply=REPLY,
             ),
         ),
     ],
@@ -116,22 +140,40 @@ def test_finished_ticket_returns_saved_result_without_running(
 
 
 def test_crashed_run_continues_where_it_stopped(
-    workflow_context, model, workflow, make_ticket
+    workflow_context, model, reply_api, workflow, make_ticket
 ):
     model.outcomes["urgent"] = HIGH
     ticket = make_ticket(id="T-1", text="urgent")
     config = thread_config("T-1")
-    # Stop the first run right after triage, before the last node starts.
+    # Stop the first run right after triage, before the reply is drafted.
     for values in workflow.stream(
         {"ticket": ticket}, config, context=workflow_context, stream_mode="values"
     ):
         if values.get("classification"):
             break
-    assert workflow.get_state(config).next == ("human_review",)
+    assert workflow.get_state(config).next == ("draft_reply",)
 
-    # Continued and paused.
+    # Continued at draft_reply, without a second triage call, and paused.
     assert run_ticket(workflow, workflow_context, ticket) is None
     assert model.call_count == 1
+    assert reply_api.call_count == 1
+
+
+def test_failed_reply_fails_the_ticket_and_the_next_run_only_drafts_again(
+    workflow_context, model, reply_api, workflow, make_ticket
+):
+    ticket = make_ticket(id="T-1", text="hi")
+    reply_api.return_value = reply_message(stop_reason="refusal")
+
+    batch = run_all([ticket], workflow=workflow, context=workflow_context)
+    assert batch.failed == ["T-1"]
+
+    reply_api.return_value = reply_message()
+    batch = run_all([ticket], workflow=workflow, context=workflow_context)
+
+    assert [c.ticket_id for c in batch.classified] == ["T-1"]
+    assert model.call_count == 1  # triage was saved before the reply failed
+    assert reply_api.call_count == 2
 
 
 def test_run_all_sorts_tickets_into_classified_paused_and_failed(

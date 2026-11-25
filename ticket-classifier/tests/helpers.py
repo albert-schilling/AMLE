@@ -3,9 +3,16 @@
 from collections.abc import Sequence
 
 import numpy as np
+from anthropic.types import Message
 
+from ticket_classifier.config import get_settings
 from ticket_classifier.knowledge.store import KnowledgeIndexMissingError
-from ticket_classifier.models import KnowledgePassage, TicketClassification
+from ticket_classifier.models import (
+    KnowledgePassage,
+    Reply,
+    RetrievalResult,
+    TicketClassification,
+)
 
 HIGH = TicketClassification(category="billing", priority="high")
 LOW = TicketClassification(category="billing", priority="low")
@@ -44,6 +51,16 @@ REFUND_PASSAGE = KnowledgePassage(
 )
 
 
+def retrieval(*passages: KnowledgePassage, dropped: int = 0) -> RetrievalResult:
+    """A retrieval result as ``retrieve_knowledge`` stores it, with the configured
+    minimum score."""
+    return RetrievalResult(
+        passages=list(passages),
+        min_score=get_settings().knowledge_min_score,
+        dropped=dropped,
+    )
+
+
 class FakeKnowledge:
     """Fake knowledge base: the same passages for every query; records the queries."""
 
@@ -60,3 +77,44 @@ class FakeKnowledge:
     def search(self, query: str, k: int) -> list[KnowledgePassage]:
         self.queries.append((query, k))
         return self.passages[:k]
+
+
+REPLY_TEXT = "Thanks for reaching out, the team is looking into it."
+REPLY = Reply(text=REPLY_TEXT, citations=[])  # what reply_message() turns into
+
+
+def reply_message(*blocks: dict, stop_reason: str = "end_turn") -> Message:
+    """An API answer as ``messages.create`` returns it. A block is ``{"text": ...}``,
+    optionally with ``"cited": [(search_result_index, cited_text), ...]``."""
+    content = [
+        {
+            "type": "text",
+            "text": block["text"],
+            "citations": [
+                {
+                    "type": "search_result_location",
+                    "search_result_index": index,
+                    "cited_text": cited_text,
+                    "source": "ignored",  # build_reply maps by index, not by source
+                    "title": None,
+                    "start_block_index": 0,
+                    "end_block_index": 1,
+                }
+                for index, cited_text in block.get("cited", [])
+            ]
+            or None,
+        }
+        for block in (blocks or ({"text": REPLY_TEXT},))
+    ]
+    return Message.model_validate(
+        {
+            "id": "msg_test",
+            "type": "message",
+            "role": "assistant",
+            "model": "test",
+            "content": content,
+            "stop_reason": stop_reason,
+            "stop_sequence": None,
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+        }
+    )

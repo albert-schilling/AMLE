@@ -1,13 +1,14 @@
 """The retrieval node, alone and in the real graph; model and knowledge base faked."""
 
 import pytest
-from helpers import REFUND_PASSAGE
+from helpers import REFUND_PASSAGE, retrieval
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.runtime import Runtime
 
 from ticket_classifier.checkpoint import thread_config
 from ticket_classifier.context import WorkflowContext
 from ticket_classifier.graph import build_workflow
+from ticket_classifier.models import RetrievalResult
 from ticket_classifier.nodes import MissingContextError, node_retrieve_knowledge
 from ticket_classifier.runner import run_ticket
 
@@ -20,7 +21,7 @@ def test_searches_with_the_ticket_text_and_top_k(knowledge, make_ticket, monkeyp
         state, Runtime(context=WorkflowContext(knowledge=knowledge))
     )
 
-    assert update == {"knowledge": [REFUND_PASSAGE]}
+    assert update == {"retrieval": retrieval(REFUND_PASSAGE)}
     assert knowledge.queries == [("Where is my refund?", 2)]
 
 
@@ -36,7 +37,11 @@ def test_leaves_out_passages_below_the_minimum_score(
         {"ticket": make_ticket()}, Runtime(context=WorkflowContext(knowledge=knowledge))
     )
 
-    assert update == {"knowledge": [REFUND_PASSAGE, edge]}
+    assert update == {
+        "retrieval": RetrievalResult(
+            passages=[REFUND_PASSAGE, edge], min_score=0.6, dropped=1
+        )
+    }
 
 
 def test_without_context_names_the_problem(make_ticket):
@@ -50,7 +55,7 @@ def test_passages_are_saved_with_the_run(model, workflow_context, make_ticket):
     run_ticket(workflow, workflow_context, make_ticket(id="T-1"))
 
     saved = workflow.get_state(thread_config("T-1")).values
-    assert saved["knowledge"] == [REFUND_PASSAGE]
+    assert saved["retrieval"] == retrieval(REFUND_PASSAGE)
 
 
 def test_retrieval_runs_after_the_customer_and_before_triage():

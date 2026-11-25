@@ -12,10 +12,13 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import StateSnapshot
 
 from .models import (
+    Citation,
     Customer,
     Escalated,
     KnowledgePassage,
     NotEscalated,
+    Reply,
+    RetrievalResult,
     Ticket,
     TicketClassification,
 )
@@ -23,10 +26,13 @@ from .models import (
 # State types saved in checkpoints; only these (and safe built-ins) load back.
 # A missing one does not fail: it loads back as a plain dict, with a warning.
 CHECKPOINT_TYPES = [
+    Citation,
     Customer,
     Escalated,
     KnowledgePassage,
     NotEscalated,
+    Reply,
+    RetrievalResult,
     Ticket,
     TicketClassification,
 ]

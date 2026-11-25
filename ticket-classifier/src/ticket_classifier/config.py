@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None  # needed only for model calls
     model: str = "claude-haiku-4-5"
     max_tokens: int = 4_000
+    reply_model: str | None = None  # model for draft_reply; None: the same as MODEL
+    reply_max_tokens: int = Field(default=1_000, gt=0)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_file: Path | None = None  # also write the logs to this file, if set
     trace_file: Path = Path("output/trace.jsonl")  # one JSON line per workflow event
@@ -46,9 +48,10 @@ class Settings(BaseSettings):
     # Words shared by neighboring chunks. 60/20 from make kb-eval, see plan_w9d1.md.
     chunk_overlap: int = Field(default=20, ge=0)
     knowledge_top_k: int = Field(default=3, gt=0)  # passages per ticket
-    # Passages below this cosine similarity are left out of the prompt. A safety floor
-    # only: real answers scored 0.54 to 0.76, unrelated questions up to 0.60.
-    knowledge_min_score: float = Field(default=0.5, ge=-1, le=1)
+    # Passages below this cosine similarity are left out of prompt and reply. 0.65
+    # from make kb-eval: keeps the answers found, leaves 7 of 8 unanswerable
+    # questions without a passage. See plan_w9d2.md, step 3.
+    knowledge_min_score: float = Field(default=0.65, ge=-1, le=1)
     # Labelled questions for make kb-eval; outside the knowledge base, never indexed.
     knowledge_questions_path: Path = Path("data/eval/knowledge_questions.json")
 

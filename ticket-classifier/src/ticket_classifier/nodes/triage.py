@@ -37,7 +37,7 @@ def node_triage(
                 {
                     "role": "user",
                     "content": create_prompt(
-                        ticket, state["customer"], state["knowledge"]
+                        ticket, state["customer"], state["retrieval"].passages
                     ),
                 }
             ],

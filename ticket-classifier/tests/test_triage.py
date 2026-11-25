@@ -1,5 +1,5 @@
 import pytest
-from helpers import LOW, REFUND_PASSAGE
+from helpers import LOW, REFUND_PASSAGE, retrieval
 
 from ticket_classifier.config import get_settings
 from ticket_classifier.graph import build_workflow
@@ -14,7 +14,7 @@ def test_calls_the_model_with_prompt_and_schema(model, make_ticket):
         {
             "ticket": make_ticket(text="My card was charged twice"),
             "customer": None,
-            "knowledge": [],
+            "retrieval": retrieval(),
         }
     )
 
@@ -31,7 +31,11 @@ def test_no_parsed_output_raises(model, make_ticket):
 
     with pytest.raises(TriageError, match="T-1.*max_tokens"):
         node_triage(
-            {"ticket": make_ticket(id="T-1"), "customer": None, "knowledge": []}
+            {
+                "ticket": make_ticket(id="T-1"),
+                "customer": None,
+                "retrieval": retrieval(),
+            }
         )
 
 
@@ -59,7 +63,11 @@ def test_custom_event_arrives_before_the_node_update(
 
 def test_retrieved_passages_reach_the_prompt(model, make_ticket):
     node_triage(
-        {"ticket": make_ticket(), "customer": None, "knowledge": [REFUND_PASSAGE]}
+        {
+            "ticket": make_ticket(),
+            "customer": None,
+            "retrieval": retrieval(REFUND_PASSAGE),
+        }
     )
 
     assert REFUND_PASSAGE.text in model.call_args.kwargs["messages"][0]["content"]

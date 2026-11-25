@@ -7,14 +7,16 @@ from langgraph.graph.state import CompiledStateGraph
 from .context import WorkflowContext
 from .models import TriageState
 from .nodes import (
+    node_draft_reply,
     node_get_customer,
     node_human_review,
     node_mark_handled,
     node_retrieve_knowledge,
     node_triage,
-    route_after_triage,
+    route_by_priority,
 )
 from .nodes.names import (
+    DRAFT_REPLY,
     GET_CUSTOMER,
     HUMAN_REVIEW,
     MARK_HANDLED,
@@ -38,13 +40,15 @@ def build_workflow(
     builder.add_node(GET_CUSTOMER, node_get_customer)
     builder.add_node(RETRIEVE_KNOWLEDGE, node_retrieve_knowledge)
     builder.add_node(TRIAGE, node_triage)
+    builder.add_node(DRAFT_REPLY, node_draft_reply)
     builder.add_node(HUMAN_REVIEW, node_human_review)
     builder.add_node(MARK_HANDLED, node_mark_handled)
 
     builder.add_edge(START, GET_CUSTOMER)
     builder.add_edge(GET_CUSTOMER, RETRIEVE_KNOWLEDGE)
     builder.add_edge(RETRIEVE_KNOWLEDGE, TRIAGE)
-    builder.add_conditional_edges(TRIAGE, route_after_triage)
+    builder.add_edge(TRIAGE, DRAFT_REPLY)
+    builder.add_conditional_edges(DRAFT_REPLY, route_by_priority)
     builder.add_edge(HUMAN_REVIEW, END)
     builder.add_edge(MARK_HANDLED, END)
 

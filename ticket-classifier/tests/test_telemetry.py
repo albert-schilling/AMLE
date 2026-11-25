@@ -4,7 +4,7 @@ import logging
 import os
 
 import pytest
-from helpers import HIGH
+from helpers import HIGH, reply_message
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.sdk._logs.export import (
     ConsoleLogRecordExporter,
@@ -189,13 +189,16 @@ def test_unmarked_line_is_not_exported_but_still_logged(exported_logs, caplog):
     assert "secret text" in caplog.text
 
 
-def test_run_and_resume_export_no_ticket_customer_or_policy_text(
-    model, knowledge, write_tickets, exported_logs, monkeypatch
+def test_run_and_resume_export_no_ticket_customer_policy_or_reply_text(
+    model, knowledge, reply_api, write_tickets, exported_logs, monkeypatch
 ):
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     knowledge.passages = [
         KnowledgePassage(source="refunds.md", ordinal=1, text="private policy", score=1)
     ]
+    reply_api.return_value = reply_message(
+        {"text": "private reply text", "cited": [(0, "private policy")]}
+    )
     model.outcomes["private ticket text"] = HIGH
     tickets = write_tickets([{"id": "T-1", "text": "private ticket text"}])
 
@@ -205,10 +208,12 @@ def test_run_and_resume_export_no_ticket_customer_or_policy_text(
     bodies = " ".join(str(record.body) for record in exported_logs())
     assert "T-1" in bodies
     assert "refunds.md#1" in bodies  # the citation is safe, the text is not
+    assert "reply drafted, citations=1" in bodies
     for private in (
         "private ticket text",
         "private reviewer note",
         "private policy",
+        "private reply",
         "alice@",
     ):
         assert private not in bodies
