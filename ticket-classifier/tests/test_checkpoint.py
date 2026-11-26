@@ -12,8 +12,8 @@ from ticket_classifier.models import (
     Citation,
     KnowledgePassage,
     Reply,
+    Retrieval,
     RetrievalResult,
-    Search,
     Ticket,
     TicketClassification,
 )
@@ -77,7 +77,7 @@ def test_search_and_reply_survive_the_serializer():
     )
     state = {
         "ticket": Ticket(id="T-1", text="x"),
-        "search": Search(queries=("refund",), result=result, ok=True),
+        "retrieval": Retrieval(queries=("refund",), result=result, ok=True),
         "reply": Reply(
             text="Refunds take 5 days. [1]",
             citations=[Citation(source="refunds.md", ordinal=1, quotes=["5 days"])],

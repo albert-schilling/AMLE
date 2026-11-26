@@ -195,7 +195,7 @@ def test_run_and_resume_export_no_ticket_customer_policy_query_or_reply_text(
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     monkeypatch.setattr(
         "ticket_classifier.commands.write_query",
-        lambda ticket, search: "private query",
+        lambda ticket, retrieval: "private query",
     )
     knowledge.passages = [
         KnowledgePassage(source="refunds.md", ordinal=1, text="private policy", score=1)
@@ -213,7 +213,7 @@ def test_run_and_resume_export_no_ticket_customer_policy_query_or_reply_text(
     assert "T-1" in bodies
     assert "refunds.md#1" in bodies  # the citation is safe, the text is not
     assert "reply drafted, citations=1" in bodies
-    assert "search 1 of 3" in bodies
+    assert "attempt 1 of 3" in bodies
     for private in (
         "private query",
         "private ticket text",

@@ -12,8 +12,8 @@ from ticket_classifier.knowledge import KnowledgeIndexMissingError
 from ticket_classifier.models import (
     KnowledgePassage,
     Reply,
+    Retrieval,
     RetrievalResult,
-    Search,
     TicketClassification,
 )
 
@@ -59,7 +59,7 @@ WEAK_PASSAGE = KnowledgePassage(
 )
 
 
-def retrieval(
+def retrieval_result(
     *passages: KnowledgePassage, weak: Sequence[KnowledgePassage] = ()
 ) -> RetrievalResult:
     """A retrieval result as ``retrieve_knowledge`` stores it, with the configured
@@ -71,16 +71,18 @@ def retrieval(
     )
 
 
-def searched(
+def retrieved(
     *passages: KnowledgePassage,
     weak: Sequence[KnowledgePassage] = (),
     queries: Sequence[str] = ("query",),
-) -> Search:
-    """A search after ``retrieve_knowledge``, not judged yet."""
-    return Search(queries=tuple(queries), result=retrieval(*passages, weak=weak))
+) -> Retrieval:
+    """A retrieval after ``retrieve_knowledge``, not judged yet."""
+    return Retrieval(
+        queries=tuple(queries), result=retrieval_result(*passages, weak=weak)
+    )
 
 
-def echo_query(ticket, search):
+def echo_query(ticket, retrieval):
     """Fake ``write_query``: the ticket text is the query."""
     return ticket.text
 
@@ -94,14 +96,14 @@ def runtime(knowledge, write_query=echo_query) -> Runtime[WorkflowContext]:
 
 class ScriptedQueries:
     """Fake ``write_query``: one answer per call, in order; an exception is raised.
-    Records the search each call got."""
+    Records the retrieval each call got."""
 
     def __init__(self, *answers: str | Exception):
         self.answers = list(answers)
         self.calls = []
 
-    def __call__(self, ticket, search):
-        self.calls.append(search)
+    def __call__(self, ticket, retrieval):
+        self.calls.append(retrieval)
         answer = self.answers.pop(0)
         if isinstance(answer, Exception):
             raise answer

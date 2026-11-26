@@ -79,8 +79,8 @@ class RetrievalResult(BaseModel):
         return max((p.score for p in self.passages + self.weak), default=None)
 
 
-class Search(BaseModel):
-    """The knowledge search of one ticket: every query tried, the latest result and
+class Retrieval(BaseModel):
+    """The knowledge retrieval of one ticket: every query tried, the latest result and
     the critique's verdict on it. Immutable: each step returns a new object."""
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
@@ -124,18 +124,18 @@ class Search(BaseModel):
         """The latest result's passages below the threshold, for a reword prompt."""
         return self.result.weak if self.result else ()
 
-    def with_query(self, query: str) -> Search:
-        """Start the next search. Result and verdict belonged to the previous query,
+    def with_query(self, query: str) -> Retrieval:
+        """Start the next attempt. Result and verdict belonged to the previous query,
         so they are cleared."""
-        return Search(queries=(*self.queries, query))
+        return Retrieval(queries=(*self.queries, query))
 
-    def with_result(self, result: RetrievalResult) -> Search:
+    def with_result(self, result: RetrievalResult) -> Retrieval:
         """The latest query's result, not judged yet."""
-        return Search(queries=self.queries, result=result)
+        return Retrieval(queries=self.queries, result=result)
 
-    def judged(self, ok: bool) -> Search:
+    def judged(self, ok: bool) -> Retrieval:
         """The critique's verdict on the latest result."""
-        return Search(queries=self.queries, result=self.result, ok=ok)
+        return Retrieval(queries=self.queries, result=self.result, ok=ok)
 
 
 class SearchQuery(BaseModel):

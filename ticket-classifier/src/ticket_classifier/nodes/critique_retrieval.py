@@ -15,24 +15,24 @@ def node_critique_retrieval(state: TriageState) -> TriageUpdate:
 
     Only the score, no model call: this check decides whether to pay for a reword.
     """
-    search = state["search"]
-    if search.result is None:
+    retrieval = state["retrieval"]
+    if retrieval.result is None:
         raise MissingResultError("critique_retrieval needs a search result")
-    ok = search.result.has_sources
+    ok = retrieval.result.has_sources
 
     if ok:
         verdict = "ok"
-    elif attempts_spent(search):
+    elif attempts_spent(retrieval):
         verdict = "weak, attempts spent: the reply goes on without sources"
     else:
         verdict = "weak, rewording the query"
-    best = search.result.best_score
+    best = retrieval.result.best_score
     safe_log.info(
-        "Ticket %s search %d of %d: best score %s, %s",
+        "Ticket %s attempt %d of %d: best score %s, %s",
         state["ticket"].id,
-        search.attempts,
+        retrieval.attempts,
         get_settings().knowledge_max_attempts,
         "none" if best is None else f"{best:.3f}",
         verdict,
     )
-    return {"search": search.judged(ok)}
+    return {"retrieval": retrieval.judged(ok)}

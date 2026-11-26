@@ -26,8 +26,8 @@ from .nodes.names import (
     HUMAN_REVIEW,
     MARK_HANDLED,
     REFORMULATE,
+    RETRIEVAL_DONE,
     RETRIEVE_KNOWLEDGE,
-    SEARCH_DONE,
     TRIAGE,
 )
 
@@ -61,7 +61,7 @@ def build_workflow(
     builder.add_conditional_edges(
         CRITIQUE_RETRIEVAL,
         route_after_critique,
-        {REFORMULATE: FORMULATE_QUERY, SEARCH_DONE: TRIAGE},
+        {REFORMULATE: FORMULATE_QUERY, RETRIEVAL_DONE: TRIAGE},
     )
     builder.add_edge(TRIAGE, DRAFT_REPLY)
     builder.add_conditional_edges(DRAFT_REPLY, route_by_priority)

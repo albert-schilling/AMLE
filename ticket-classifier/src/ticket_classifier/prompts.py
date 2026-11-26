@@ -6,7 +6,7 @@ from anthropic.types import (
     TextBlockParam,
 )
 
-from .models import Customer, KnowledgePassage, Search, Ticket, TicketClassification
+from .models import Customer, KnowledgePassage, Retrieval, Ticket, TicketClassification
 
 # One block per rule; keep the untrusted-input rule last.
 ROLE = "You are a support ticket triage assistant."
@@ -80,7 +80,7 @@ QUERY_SYSTEM_PROMPT = " ".join([QUERY_ROLE, QUERY_FORMAT, UNTRUSTED_TICKET])
 REWORD_SYSTEM_PROMPT = " ".join([QUERY_ROLE, QUERY_FORMAT, REWORD, UNTRUSTED_TICKET])
 
 
-def query_prompt(ticket: Ticket, search: Search) -> str:
+def query_prompt(ticket: Ticket, retrieval: Retrieval) -> str:
     """The user message that asks the model for a search query.
 
     On the first search it holds only the ticket. When rewording, it also lists the
@@ -88,11 +88,11 @@ def query_prompt(ticket: Ticket, search: Search) -> str:
     last, so nothing after it can be mistaken for ticket text.
     """
     parts = ["Write a search query for the following ticket."]
-    if search.queries:
-        tried = "\n".join(f"- {query}" for query in search.queries)
+    if retrieval.queries:
+        tried = "\n".join(f"- {query}" for query in retrieval.queries)
         parts.append(f"<tried_queries>\n{tried}\n</tried_queries>")
-    if search.weak_passages:
-        parts.append(policies_block(search.weak_passages))
+    if retrieval.weak_passages:
+        parts.append(policies_block(retrieval.weak_passages))
     parts.append(f"<ticket>\n{ticket.text}\n</ticket>")
     return "\n".join(parts)
 

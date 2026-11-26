@@ -15,11 +15,13 @@ def node_formulate_query(
     that failed and the passages they found, so it can move away from them."""
     context = require_context(runtime, FORMULATE_QUERY)
     ticket = state["ticket"]
-    search = state["search"]
+    retrieval = state["retrieval"]
 
-    query = context.write_query(ticket, search)
+    query = context.write_query(ticket, retrieval)
 
     # The query can quote the ticket: it stays on the console. critique_retrieval
-    # sends the exported line of this search.
-    logger.info("Ticket %s search %d query: %r", ticket.id, search.attempts + 1, query)
-    return {"search": search.with_query(query)}
+    # sends the exported line of this attempt.
+    logger.info(
+        "Ticket %s attempt %d query: %r", ticket.id, retrieval.attempts + 1, query
+    )
+    return {"retrieval": retrieval.with_query(query)}

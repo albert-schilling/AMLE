@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from .client import get_client
 from .config import get_settings
-from .models import Search, SearchQuery, Ticket
+from .models import Retrieval, SearchQuery, Ticket
 from .prompts import QUERY_SYSTEM_PROMPT, REWORD_SYSTEM_PROMPT, query_prompt
 from .telemetry import get_loggers
 
@@ -13,15 +13,15 @@ logger, safe_log = get_loggers(__name__)
 QUERY_MAX_TOKENS = 200  # a few keywords
 
 
-def write_query(ticket: Ticket, search: Search) -> str:
+def write_query(ticket: Ticket, retrieval: Retrieval) -> str:
     """The next search query for the ticket; after a failed search, a reworded one.
 
     Falls back to the ticket text if the model gives no usable query. An
     ``APIError`` is raised: the ticket fails like a triage failure.
     """
     settings = get_settings()
-    system = REWORD_SYSTEM_PROMPT if search.attempts else QUERY_SYSTEM_PROMPT
-    content = query_prompt(ticket, search)
+    system = REWORD_SYSTEM_PROMPT if retrieval.attempts else QUERY_SYSTEM_PROMPT
+    content = query_prompt(ticket, retrieval)
 
     try:
         output = get_client().messages.parse(

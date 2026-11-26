@@ -5,7 +5,7 @@ from typing import Annotated, Literal, TypedDict
 from pydantic import BaseModel, Field
 
 from .domain import Customer, Ticket, TicketClassification
-from .knowledge import KnowledgePassage, Search
+from .knowledge import KnowledgePassage, Retrieval
 from .reply import Reply
 
 
@@ -25,7 +25,7 @@ class TriageUpdate(TypedDict, total=False):
     """What a node returns: only the keys it writes. All keys may be missing."""
 
     customer: Customer | None  # None: no id, unknown, or unreadable
-    search: Search  # queries, latest result and verdict of the knowledge search
+    retrieval: Retrieval  # queries, latest result and verdict
     classification: TicketClassification
     reply: Reply  # draft with cited policies, for a person to send
     escalation: Escalation
@@ -41,8 +41,8 @@ class TriageState(TriageUpdate):
 
 
 def initial_state(ticket: Ticket) -> TriageState:
-    """What a new run starts with: the ticket and a search with no query yet."""
-    return TriageState(ticket=ticket, search=Search())
+    """What a new run starts with: the ticket and a retrieval with no query yet."""
+    return TriageState(ticket=ticket, retrieval=Retrieval())
 
 
 class EscalationRequest(TypedDict):

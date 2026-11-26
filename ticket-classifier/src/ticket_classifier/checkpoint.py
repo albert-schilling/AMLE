@@ -18,8 +18,8 @@ from .models import (
     KnowledgePassage,
     NotEscalated,
     Reply,
+    Retrieval,
     RetrievalResult,
-    Search,
     Ticket,
     TicketClassification,
 )
@@ -34,7 +34,7 @@ CHECKPOINT_TYPES = [
     NotEscalated,
     Reply,
     RetrievalResult,
-    Search,
+    Retrieval,
     Ticket,
     TicketClassification,
 ]

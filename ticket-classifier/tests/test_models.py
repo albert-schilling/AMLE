@@ -5,8 +5,8 @@ from ticket_classifier.models import (
     ClassifiedTicket,
     EscalatedTicket,
     ResolvedTicket,
+    Retrieval,
     RetrievalResult,
-    Search,
     TicketClassification,
 )
 
@@ -62,12 +62,14 @@ RESULT_OF_A_SEARCH = RetrievalResult(passages=(), weak=(), min_score=0.65)
 )
 def test_search_steps_out_of_order_are_rejected(fields):
     with pytest.raises(ValidationError):
-        Search(**fields)
+        Retrieval(**fields)
 
 
 def test_next_query_clears_the_result_and_verdict_of_the_previous_one():
-    judged = Search(queries=("refund",)).with_result(RESULT_OF_A_SEARCH).judged(False)
+    judged = (
+        Retrieval(queries=("refund",)).with_result(RESULT_OF_A_SEARCH).judged(False)
+    )
 
-    assert judged.with_query("refund policy") == Search(
+    assert judged.with_query("refund policy") == Retrieval(
         queries=("refund", "refund policy")
     )

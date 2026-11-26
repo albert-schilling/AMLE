@@ -8,7 +8,7 @@ from typing import Protocol
 
 from langgraph.runtime import Runtime
 
-from .models import KnowledgePassage, Search, Ticket
+from .models import KnowledgePassage, Retrieval, Ticket
 
 
 class KnowledgeSearch(Protocol):
@@ -25,7 +25,7 @@ class QueryWriter(Protocol):
     ``queries.write_query`` asks the model; tests use a fake.
     """
 
-    def __call__(self, ticket: Ticket, search: Search) -> str: ...
+    def __call__(self, ticket: Ticket, retrieval: Retrieval) -> str: ...
 
 
 @dataclass(frozen=True)

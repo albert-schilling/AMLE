@@ -15,4 +15,4 @@ MARK_HANDLED: Final = "mark_handled"
 
 # Edge labels of route_after_critique; graph.py maps them to nodes.
 REFORMULATE: Final = "reformulate"
-SEARCH_DONE: Final = "search_done"
+RETRIEVAL_DONE: Final = "retrieval_done"

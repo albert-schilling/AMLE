@@ -248,7 +248,7 @@ def test_spans_hold_no_ticket_customer_policy_query_or_reply_text(
 ):
     mocker.patch(
         "ticket_classifier.commands.write_query",
-        lambda ticket, search: f"private query {search.attempts}",
+        lambda ticket, retrieval: f"private query {retrieval.attempts}",
     )
     knowledge.passages = [PRIVATE_PASSAGE]
     reply_api.return_value = reply_message(

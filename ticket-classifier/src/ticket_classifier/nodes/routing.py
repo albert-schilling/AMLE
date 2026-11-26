@@ -1,8 +1,8 @@
 from typing import Literal
 
 from ..config import get_settings
-from ..models import Search, TriageState
-from .names import HUMAN_REVIEW, MARK_HANDLED, REFORMULATE, SEARCH_DONE
+from ..models import Retrieval, TriageState
+from .names import HUMAN_REVIEW, MARK_HANDLED, REFORMULATE, RETRIEVAL_DONE
 
 
 def route_by_priority(state: TriageState) -> Literal["human_review", "mark_handled"]:
@@ -16,19 +16,21 @@ def route_by_priority(state: TriageState) -> Literal["human_review", "mark_handl
     return MARK_HANDLED
 
 
-def route_after_critique(state: TriageState) -> Literal["reformulate", "search_done"]:
+def route_after_critique(
+    state: TriageState,
+) -> Literal["reformulate", "retrieval_done"]:
     """Search again with a new query while the result is weak and attempts are left.
 
     The only way back in the graph; ``KNOWLEDGE_MAX_ATTEMPTS`` bounds it. Returns
     labels, not node names: ``graph.py`` maps them, and the diagram shows them on
     the edges.
     """
-    search = state["search"]
-    if search.ok or attempts_spent(search):
-        return SEARCH_DONE
+    retrieval = state["retrieval"]
+    if retrieval.ok or attempts_spent(retrieval):
+        return RETRIEVAL_DONE
     return REFORMULATE
 
 
-def attempts_spent(search: Search) -> bool:
+def attempts_spent(retrieval: Retrieval) -> bool:
     """``KNOWLEDGE_MAX_ATTEMPTS`` searches are done: no reword is left."""
-    return search.attempts >= get_settings().knowledge_max_attempts
+    return retrieval.attempts >= get_settings().knowledge_max_attempts

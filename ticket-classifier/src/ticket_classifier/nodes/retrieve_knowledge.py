@@ -20,12 +20,12 @@ def node_retrieve_knowledge(
     the minimum score."""
     context = require_context(runtime, RETRIEVE_KNOWLEDGE)
     ticket = state["ticket"]
-    search = state["search"]
-    if search.query is None:
+    retrieval = state["retrieval"]
+    if retrieval.query is None:
         raise MissingQueryError(f"{RETRIEVE_KNOWLEDGE} needs a search query")
     settings = get_settings()
 
-    found = context.knowledge.search(search.query, settings.knowledge_top_k)
+    found = context.knowledge.search(retrieval.query, settings.knowledge_top_k)
     result = RetrievalResult.split(found, settings.knowledge_min_score)
 
     safe_log.info(
@@ -35,4 +35,4 @@ def node_retrieve_knowledge(
         result.dropped,
         ", ".join(f"{p.citation} {p.score:.3f}" for p in found),
     )
-    return {"search": search.with_result(result)}
+    return {"retrieval": retrieval.with_result(result)}

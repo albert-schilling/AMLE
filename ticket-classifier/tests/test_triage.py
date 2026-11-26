@@ -1,5 +1,5 @@
 import pytest
-from helpers import LOW, REFUND_PASSAGE, searched
+from helpers import LOW, REFUND_PASSAGE, retrieved
 
 from ticket_classifier.config import get_settings
 from ticket_classifier.graph import build_workflow
@@ -14,7 +14,7 @@ def test_calls_the_model_with_prompt_and_schema(model, make_ticket):
         {
             "ticket": make_ticket(text="My card was charged twice"),
             "customer": None,
-            "search": searched(),
+            "retrieval": retrieved(),
         }
     )
 
@@ -34,7 +34,7 @@ def test_no_parsed_output_raises(model, make_ticket):
             {
                 "ticket": make_ticket(id="T-1"),
                 "customer": None,
-                "search": searched(),
+                "retrieval": retrieved(),
             }
         )
 
@@ -66,7 +66,7 @@ def test_retrieved_passages_reach_the_prompt(model, make_ticket):
         {
             "ticket": make_ticket(),
             "customer": None,
-            "search": searched(REFUND_PASSAGE),
+            "retrieval": retrieved(REFUND_PASSAGE),
         }
     )
 

@@ -5,8 +5,8 @@ from .knowledge import (
     Chunk,
     EvalQuestion,
     KnowledgePassage,
+    Retrieval,
     RetrievalResult,
-    Search,
     SearchQuery,
 )
 from .reply import Citation, Reply
@@ -41,7 +41,7 @@ __all__ = [
     "Reply",
     "ResolvedTicket",
     "RetrievalResult",
-    "Search",
+    "Retrieval",
     "SearchQuery",
     "Ticket",
     "TicketClassification",
