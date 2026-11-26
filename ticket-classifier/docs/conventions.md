@@ -19,20 +19,30 @@ Write clean code for humans: code a reader understands on the first pass.
 
 ## Structure
 
-- `models/` holds data only (pydantic models, TypedDicts, `Literal` types), no logic.
+- `models/` holds data (pydantic models, TypedDicts, `Literal` types) and only the
+  code that builds or reads it, like `initial_state` or `Search.with_query`: no I/O,
+  no model calls, no settings.
   Input in `domain.py`, graph state in `state.py`, output rows in `results.py`.
-- One file per node in `nodes/`. Use node names only from `nodes/names.py`, never as
-  string literals.
+- A package exports its public interface in `__init__.py` (with `__all__`), and the
+  rest of the app imports from there: `from .knowledge import open_knowledge_base`,
+  not from `.knowledge.store`. Tests may import a submodule for its internals.
+- One file per node in `nodes/`. Use node names and edge labels only from
+  `nodes/names.py`, never as string literals.
 - Every run goes through `runner.run_thread`; a thread's status comes only from
   `checkpoint.run_status`.
 - The checkpointer is passed to `build_workflow`, never created inside it.
 - `cli.py` maps commands to exit codes; the work happens in `commands.py`.
 - A command checks what it needs (API key, database, model, index) before the first
   ticket, so a missing piece costs no API call.
-- Handles a node needs, like the knowledge base, come through the runtime context
-  (`WorkflowContext`), not through the state: the state is saved in checkpoints.
+- Handles a node needs, like the knowledge base or the query writer, come through
+  the runtime context (`WorkflowContext`), not through the state: the state is saved
+  in checkpoints. Tests pass fakes there, so a graph test makes no hidden model call.
 - A new type in the graph state joins `CHECKPOINT_TYPES`, or it loads back as a plain
   dict.
+- Models in the graph state are immutable: `frozen=True`, tuples instead of lists. A
+  node returns a new object (e.g. `search.with_query(query)`), never edits one in
+  place. Build new objects with the constructor; `model_copy(update=...)` skips
+  validation.
 - A `Protocol` lives with the code that uses it, not with the code that implements it.
 - API citations and structured outputs cannot be combined (400 error). A call with
   citations uses `messages.create` without an output format, and our code builds the
@@ -45,7 +55,7 @@ Write clean code for humans: code a reader understands on the first pass.
 - Use `safe_log` only for ids, counts and labels: never file paths or ticket, customer,
   reviewer or error text. Policy passages: citations (`refunds.md#2`) and scores only,
   never their text or the query. Replies: citation counts and sources only, never the
-  text or the quotes.
+  text or the quotes. Search queries: like ticket text, console only.
 - For a caught error, log its type with `safe_log` and the full error with `logger`.
 
 ## Types
@@ -88,3 +98,7 @@ treats `_name` in a model as a private attribute).
 
 - Code, comments, docs and commit messages in plain, short English.
 - Comments say why, not what.
+- Prefer docstrings to comments where a reader looks things up: modules, classes,
+  functions, properties, and fields of pydantic models (with
+  `use_attribute_docstrings=True`, so the docstring is also the field's
+  description). A `#` comment stays for a note on one line of code.

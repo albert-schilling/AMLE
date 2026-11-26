@@ -205,15 +205,16 @@ def ticket_span(
 
 
 def record_state(state: TriageState) -> None:
-    """Put what the state has so far on the current span: policy passages, category,
-    priority and the reply's citations.
+    """Put what the state has so far on the current span: policy passages, search
+    count and verdict, category, priority and the reply's citations.
 
     Passages and reply only as citations, counts and scores: their text, the quotes
-    and the query stay out.
+    and the search queries stay out.
     """
     span = trace.get_current_span()
 
-    retrieval = state.get("retrieval")
+    search = state.get("search")
+    retrieval = search.result if search is not None else None
     if retrieval is not None:
         passages = retrieval.passages
         span.set_attributes(
@@ -235,6 +236,11 @@ def record_state(state: TriageState) -> None:
                 "priority": classification.priority,
             }
         )
+
+    if search is not None and search.attempts:
+        span.set_attribute("knowledge.attempts", search.attempts)
+    if search is not None and search.ok is not None:
+        span.set_attribute("knowledge.retrieval_ok", search.ok)
 
     reply = state.get("reply")
     if reply is not None:

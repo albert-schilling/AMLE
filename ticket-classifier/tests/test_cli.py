@@ -3,17 +3,15 @@ import pytest
 
 from ticket_classifier.cli import main
 from ticket_classifier.commands import MissingApiKeyError
-from ticket_classifier.knowledge.documents import NoDocumentsError
-from ticket_classifier.knowledge.embedder import EmbeddingModelMissingError
-from ticket_classifier.knowledge.evaluation import (
+from ticket_classifier.knowledge import (
     ChunkSettingResult,
+    EmbeddingModelMissingError,
+    KnowledgeDatabaseNotConfiguredError,
     KnowledgeEvaluation,
+    KnowledgeIndexMissingError,
+    NoDocumentsError,
     SearchQuality,
     ThresholdResult,
-)
-from ticket_classifier.knowledge.store import (
-    KnowledgeDatabaseNotConfiguredError,
-    KnowledgeIndexMissingError,
 )
 from ticket_classifier.runner import BatchResult, NotPausedError
 

@@ -5,12 +5,13 @@ from pydantic import ValidationError
 from . import commands
 from .args import KbEvalArgs, KbIndexArgs, ResumeArgs, RunArgs, parse_args
 from .config import Settings, get_settings
-from .knowledge.documents import NoDocumentsError
-from .knowledge.embedder import EmbeddingModelMissingError
-from .knowledge.evaluation import results_table, thresholds_table
-from .knowledge.store import (
+from .knowledge import (
+    EmbeddingModelMissingError,
     KnowledgeDatabaseNotConfiguredError,
     KnowledgeIndexMissingError,
+    NoDocumentsError,
+    results_table,
+    thresholds_table,
 )
 from .logging_config import configure_logging
 from .runner import NotPausedError

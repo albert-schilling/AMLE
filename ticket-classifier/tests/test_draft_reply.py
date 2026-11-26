@@ -1,6 +1,6 @@
 """The reply node alone and in the real graph; the API is faked."""
 
-from helpers import HIGH, REFUND_PASSAGE, reply_message, retrieval
+from helpers import HIGH, REFUND_PASSAGE, reply_message, searched
 
 from ticket_classifier.config import get_settings
 from ticket_classifier.graph import build_workflow
@@ -13,7 +13,7 @@ def state(make_ticket, *passages):
         "ticket": make_ticket(text="Where is my refund?"),
         "customer": None,
         "classification": HIGH,
-        "retrieval": retrieval(*passages),
+        "search": searched(*passages),
     }
 
 

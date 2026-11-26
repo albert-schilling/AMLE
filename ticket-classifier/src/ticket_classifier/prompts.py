@@ -1,10 +1,12 @@
+from collections.abc import Sequence
+
 from anthropic.types import (
     ContentBlockParam,
     SearchResultBlockParam,
     TextBlockParam,
 )
 
-from .models import Customer, KnowledgePassage, Ticket, TicketClassification
+from .models import Customer, KnowledgePassage, Search, Ticket, TicketClassification
 
 # One block per rule; keep the untrusted-input rule last.
 ROLE = "You are a support ticket triage assistant."
@@ -34,7 +36,7 @@ SYSTEM_PROMPT = " ".join([ROLE, CATEGORY, PRIORITY, POLICIES, UNTRUSTED_TICKET])
 
 
 def create_prompt(
-    ticket: Ticket, customer: Customer | None, knowledge: list[KnowledgePassage]
+    ticket: Ticket, customer: Customer | None, knowledge: Sequence[KnowledgePassage]
 ) -> str:
     """The user message: customer record and policies (trusted), then the ticket
     text (untrusted), last so nothing after it can be mistaken for it."""
@@ -47,7 +49,7 @@ def create_prompt(
     return "\n".join(parts)
 
 
-def policies_block(knowledge: list[KnowledgePassage]) -> str:
+def policies_block(knowledge: Sequence[KnowledgePassage]) -> str:
     """Each passage in its own tag, with its source, so it can be cited later."""
     policies = "\n".join(
         f'<policy source="{passage.source}" part="{passage.ordinal}">\n'
@@ -55,6 +57,44 @@ def policies_block(knowledge: list[KnowledgePassage]) -> str:
         for passage in knowledge
     )
     return f"<policies>\n{policies}\n</policies>"
+
+
+# The search query for the knowledge base, and its rewording after a weak search.
+QUERY_ROLE = (
+    "You write search queries for a knowledge base of company support policies."
+)
+
+QUERY_FORMAT = (
+    "Answer with a few keywords that name the policy topic of the ticket, e.g. "
+    "'refund double charge'. No punctuation, and no names, order numbers or other "
+    "personal data."
+)
+
+REWORD = (
+    "The queries inside <tried_queries> tags found no passage close enough. Write a "
+    "different query: try a synonym, a broader term or the policy area. The "
+    "passages they found are inside <policies> tags, to show what to move away from."
+)
+
+QUERY_SYSTEM_PROMPT = " ".join([QUERY_ROLE, QUERY_FORMAT, UNTRUSTED_TICKET])
+REWORD_SYSTEM_PROMPT = " ".join([QUERY_ROLE, QUERY_FORMAT, REWORD, UNTRUSTED_TICKET])
+
+
+def query_prompt(ticket: Ticket, search: Search) -> str:
+    """The user message that asks the model for a search query.
+
+    On the first search it holds only the ticket. When rewording, it also lists the
+    queries that failed and the weak passages the last one found. The ticket comes
+    last, so nothing after it can be mistaken for ticket text.
+    """
+    parts = ["Write a search query for the following ticket."]
+    if search.queries:
+        tried = "\n".join(f"- {query}" for query in search.queries)
+        parts.append(f"<tried_queries>\n{tried}\n</tried_queries>")
+    if search.weak_passages:
+        parts.append(policies_block(search.weak_passages))
+    parts.append(f"<ticket>\n{ticket.text}\n</ticket>")
+    return "\n".join(parts)
 
 
 # The reply. Policies arrive as search results, so the API cites them itself.
@@ -85,7 +125,7 @@ def reply_content(
     ticket: Ticket,
     customer: Customer | None,
     classification: TicketClassification,
-    passages: list[KnowledgePassage],
+    passages: Sequence[KnowledgePassage],
 ) -> list[ContentBlockParam]:
     """The user message for the reply: customer and classification, the policies as
     search results, then the untrusted ticket last."""

@@ -7,7 +7,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from ticket_classifier.checkpoint import thread_config
 from ticket_classifier.graph import build_workflow
-from ticket_classifier.models import EscalatedTicket, ResolvedTicket
+from ticket_classifier.models import EscalatedTicket, ResolvedTicket, initial_state
 from ticket_classifier.runner import (
     NotPausedError,
     resume_ticket,
@@ -147,7 +147,7 @@ def test_crashed_run_continues_where_it_stopped(
     config = thread_config("T-1")
     # Stop the first run right after triage, before the reply is drafted.
     for values in workflow.stream(
-        {"ticket": ticket}, config, context=workflow_context, stream_mode="values"
+        initial_state(ticket), config, context=workflow_context, stream_mode="values"
     ):
         if values.get("classification"):
             break

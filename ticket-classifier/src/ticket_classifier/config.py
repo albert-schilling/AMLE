@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     max_tokens: int = 4_000
     reply_model: str | None = None  # model for draft_reply; None: the same as MODEL
     reply_max_tokens: int = Field(default=1_000, gt=0)
+    query_model: str | None = None  # model for search queries; None: MODEL
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_file: Path | None = None  # also write the logs to this file, if set
     trace_file: Path = Path("output/trace.jsonl")  # one JSON line per workflow event
@@ -52,6 +53,9 @@ class Settings(BaseSettings):
     # from make kb-eval: keeps the answers found, leaves 7 of 8 unanswerable
     # questions without a passage. See plan_w9d2.md, step 3.
     knowledge_min_score: float = Field(default=0.65, ge=-1, le=1)
+    # Searches per ticket: the first query, then rewords while no passage passes
+    # knowledge_min_score. Bounds the retrieval loop.
+    knowledge_max_attempts: int = Field(default=3, ge=1)
     # Labelled questions for make kb-eval; outside the knowledge base, never indexed.
     knowledge_questions_path: Path = Path("data/eval/knowledge_questions.json")
 

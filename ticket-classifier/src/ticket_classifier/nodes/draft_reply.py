@@ -21,7 +21,7 @@ def node_draft_reply(
     """
     settings = get_settings()
     ticket = state["ticket"]
-    passages = state["retrieval"].passages
+    passages = state["search"].passages
     model = settings.reply_model or settings.model
 
     writer({"event": "drafting reply", "ticket_id": ticket.id, "model": model})

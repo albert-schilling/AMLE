@@ -5,7 +5,7 @@ from typing import Annotated, Literal, TypedDict
 from pydantic import BaseModel, Field
 
 from .domain import Customer, Ticket, TicketClassification
-from .knowledge import KnowledgePassage, RetrievalResult
+from .knowledge import KnowledgePassage, Search
 from .reply import Reply
 
 
@@ -25,19 +25,24 @@ class TriageUpdate(TypedDict, total=False):
     """What a node returns: only the keys it writes. All keys may be missing."""
 
     customer: Customer | None  # None: no id, unknown, or unreadable
-    retrieval: RetrievalResult  # policy passages for the ticket, best first
+    search: Search  # queries, latest result and verdict of the knowledge search
     classification: TicketClassification
     reply: Reply  # draft with cited policies, for a person to send
     escalation: Escalation
 
 
 class TriageState(TriageUpdate):
-    """One ticket's run. Only ``ticket`` is given at the start; nodes add the rest.
+    """One ticket's run. ``initial_state`` gives the first keys; nodes add the rest.
 
     A TypedDict has no defaults: a key that no node has written yet is missing.
     """
 
     ticket: Ticket
+
+
+def initial_state(ticket: Ticket) -> TriageState:
+    """What a new run starts with: the ticket and a search with no query yet."""
+    return TriageState(ticket=ticket, search=Search())
 
 
 class EscalationRequest(TypedDict):
@@ -48,7 +53,9 @@ class EscalationRequest(TypedDict):
     ticket: Ticket
     customer: Customer | None
     classification: TicketClassification
-    policies: list[KnowledgePassage]  # the passages triage saw, best first
+    # The passages triage saw, best first. A list: in a plain dict, msgpack would load
+    # a tuple back as a list.
+    policies: list[KnowledgePassage]
     reply: Reply  # the draft; its citations name the policies it uses
 
 

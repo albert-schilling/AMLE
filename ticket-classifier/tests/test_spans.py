@@ -121,6 +121,18 @@ def test_ticket_span_marks_a_reply_without_sources(
     assert span.attributes["reply.has_sources"] is False
 
 
+def test_ticket_span_has_search_attempts_and_verdict(
+    model, knowledge, write_tickets, finished_spans, monkeypatch
+):
+    monkeypatch.setenv("KNOWLEDGE_MAX_ATTEMPTS", "2")
+    knowledge.passages = []
+    main(["run", str(write_tickets([{"id": "T-1", "text": "x"}]))])
+
+    (span,) = by_name(finished_spans(), "ticket.run")
+    assert span.attributes["knowledge.attempts"] == 2
+    assert span.attributes["knowledge.retrieval_ok"] is False
+
+
 def test_ticket_span_without_passages_has_no_top_score(
     model, knowledge, write_tickets, finished_spans
 ):
@@ -231,9 +243,13 @@ def test_only_a_run_without_work_is_marked_reused(model, write_tickets, finished
     assert second.attributes["ticket.status"] == "finished"
 
 
-def test_spans_hold_no_ticket_customer_policy_or_reply_text(
-    model, knowledge, reply_api, write_tickets, finished_spans
+def test_spans_hold_no_ticket_customer_policy_query_or_reply_text(
+    model, knowledge, reply_api, write_tickets, finished_spans, mocker
 ):
+    mocker.patch(
+        "ticket_classifier.commands.write_query",
+        lambda ticket, search: f"private query {search.attempts}",
+    )
     knowledge.passages = [PRIVATE_PASSAGE]
     reply_api.return_value = reply_message(
         {"text": "private reply text", "cited": [(0, "private policy text")]}
@@ -256,6 +272,7 @@ def test_spans_hold_no_ticket_customer_policy_or_reply_text(
         "private reviewer",
         "private policy",
         "private reply",
+        "private query",
         "alice",
     )
     for private in private_texts:

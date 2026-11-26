@@ -7,7 +7,7 @@ from helpers import HIGH
 
 from ticket_classifier import commands
 from ticket_classifier.config import get_settings
-from ticket_classifier.knowledge.store import KnowledgeIndexMissingError
+from ticket_classifier.knowledge import KnowledgeIndexMissingError
 
 
 @pytest.fixture

@@ -21,7 +21,7 @@ def escalation_request(state: TriageState) -> EscalationRequest:
         "ticket": state["ticket"],
         "customer": state["customer"],
         "classification": state["classification"],
-        "policies": state["retrieval"].passages,
+        "policies": list(state["search"].passages),
         "reply": state["reply"],
     }
 

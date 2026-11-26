@@ -4,13 +4,19 @@ Classifies support tickets into a category (`billing`, `technical`, `account`, `
 and a priority (`low`, `medium`, `high`) with Claude, as a LangGraph workflow:
 
 ```
-START → get_customer → retrieve_knowledge → triage → draft_reply → high priority? → human_review → END
-                                                                          else → mark_handled → END
+START → get_customer → formulate_query → retrieve_knowledge → critique_retrieval → triage → draft_reply → high priority? → human_review → END
+                             ▲                                       │                                          else → mark_handled → END
+                             └──────── weak, attempts left ──────────┘
 ```
 
 - `get_customer` reads the customer from `CUSTOMERS_PATH` (if the ticket has an id).
-- `retrieve_knowledge` finds the policy passages closest in meaning to the ticket
-  text (see [Knowledge base](#knowledge-base)). `triage` gets them in the prompt.
+- `formulate_query` asks Claude for a short search query (a few keywords naming the
+  policy topic). `retrieve_knowledge` searches it (see
+  [Knowledge base](#knowledge-base)). `critique_retrieval` checks the result without
+  a model call: did a passage pass `KNOWLEDGE_MIN_SCORE`? If not, Claude rewords the
+  query, shown the failed queries and what they found, and the search runs again, up
+  to `KNOWLEDGE_MAX_ATTEMPTS` searches (default 3). Then `triage` gets the passages
+  of the last search, or none. No usable query falls back to the ticket text.
 - `triage` makes one structured-output call to Claude. No classification (refusal,
   `max_tokens`) fails the ticket; the next run retries it.
 - `draft_reply` makes a second call and drafts a reply to the customer from the
@@ -43,7 +49,10 @@ uv run ticket-classifier run path/to/tickets.json
 uv run python -m ticket_classifier run   # same program, without the console script
 ```
 
-Calls the Anthropic API and may incur charges.
+Calls the Anthropic API and may incur charges: per ticket one to
+`KNOWLEDGE_MAX_ATTEMPTS` query calls, one triage call and one reply call.
+`fixtures/tickets_agentic.json` shows the search loop: a venting ticket that needs a
+better query, and a question the policies do not cover.
 
 ### Human review of high-priority tickets
 
@@ -116,15 +125,15 @@ make kb-eval                      # compare chunk settings on labelled questions
 - One index per model and chunk setting (`CHUNK_SIZE`, `CHUNK_OVERLAP`), so settings
   sit side by side. `kb-index` stores a hash of the documents and embeds only when it
   changed.
-- `retrieve_knowledge` embeds the ticket text and takes the `KNOWLEDGE_TOP_K` closest
+- `retrieve_knowledge` embeds the search query and takes the `KNOWLEDGE_TOP_K` closest
   chunks by cosine similarity (`<=>`, exact search). Passages below
   `KNOWLEDGE_MIN_SCORE` (default 0.65) are left out and only counted; the prompt
   says passages can be unrelated.
 - Only `kb-index` may download the model (to `EMBEDDING_CACHE_PATH`); `run` loads it
   from there. Hugging Face telemetry is turned off.
-- Telemetry gets passage and dropped counts, citations (`refunds.md#2`) and scores,
-  and for the reply its citation count and sources; never passage, ticket or reply
-  text.
+- Telemetry gets passage and dropped counts, citations (`refunds.md#2`), scores,
+  the number of searches and the verdict, and for the reply its citation count and
+  sources; never passage, ticket, query or reply text.
 - `kb-eval` measures hit@1, hit@3 and mean reciprocal rank for vector search and
   PostgreSQL full-text search, on `data/eval/knowledge_questions.json`. Each setting
   gets its own index; `run` keeps using the configured one. It also compares minimum
@@ -155,13 +164,14 @@ Dashboards (user `admin`): [metrics](http://localhost:3000/d/ticket-classifier),
 
 Environment variables or `.env`, see [.env.example](.env.example):
 `ANTHROPIC_API_KEY` (required for `run`), `MODEL`, `MAX_TOKENS`, `REPLY_MODEL`
-(default: `MODEL`), `REPLY_MAX_TOKENS`, `LOG_LEVEL`, `LOG_FILE`,
+(default: `MODEL`), `REPLY_MAX_TOKENS`, `QUERY_MODEL` (default: `MODEL`), `LOG_LEVEL`, `LOG_FILE`,
 `TRACE_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`,
 `CHECKPOINT_PATH`, `GRAPH_PATH`.
 
 Knowledge base: `KNOWLEDGE_DATABASE_URL` (required for `run` and `kb-index`),
 `KNOWLEDGE_BASE_PATH`, `EMBEDDING_MODEL`, `EMBEDDING_CACHE_PATH`, `CHUNK_SIZE`,
-`CHUNK_OVERLAP`, `KNOWLEDGE_TOP_K`, `KNOWLEDGE_MIN_SCORE`, `KNOWLEDGE_QUESTIONS_PATH`.
+`CHUNK_OVERLAP`, `KNOWLEDGE_TOP_K`, `KNOWLEDGE_MIN_SCORE`, `KNOWLEDGE_MAX_ATTEMPTS`,
+`KNOWLEDGE_QUESTIONS_PATH`.
 PostgreSQL credentials: `database/.env`.
 
 OpenTelemetry (off by default): `OTEL_ENABLED`, `OTEL_SERVICE_NAME`,
@@ -178,10 +188,11 @@ OpenTelemetry (off by default): `OTEL_ENABLED`, `OTEL_SERVICE_NAME`,
 | `checkpoint.py` | SQLite checkpointer that loads only known state types |
 | `runner.py` | run each ticket in its own thread (streamed), resume paused or crashed runs, collect failures |
 | `graph.py` | build the workflow, write the mermaid diagram |
-| `context.py` | runtime context of a run (the knowledge base), not saved in checkpoints |
+| `context.py` | runtime context of a run (knowledge base, query writer), not saved in checkpoints |
 | `knowledge/` | `documents.py`, `chunking.py`, `embedder.py` (fastembed), `store.py` (PostgreSQL), `evaluation.py` (kb-eval) |
 | `nodes/` | one file per node, the router, the node names |
 | `prompts.py`, `client.py` | system prompts and user messages (triage, reply), Anthropic client |
+| `queries.py` | the search query call: opening query or reword, fallback to the ticket text |
 | `replies.py` | build the `Reply` from the API answer: citation numbers, markers, source list |
 | `customers.py` | customer data access (swap for a DB later) |
 | `storage.py` | read tickets, write or merge results |

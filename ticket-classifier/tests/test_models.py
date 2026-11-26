@@ -5,6 +5,8 @@ from ticket_classifier.models import (
     ClassifiedTicket,
     EscalatedTicket,
     ResolvedTicket,
+    RetrievalResult,
+    Search,
     TicketClassification,
 )
 
@@ -48,3 +50,24 @@ NO_REPLY = {"ticket_id": "T-1", "category": "billing", "priority": "low"}
 def test_impossible_results_are_rejected(row):
     with pytest.raises(ValidationError):
         RESULT.validate_python(row)
+
+
+RESULT_OF_A_SEARCH = RetrievalResult(passages=(), weak=(), min_score=0.65)
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"result": RESULT_OF_A_SEARCH}, {"queries": ("refund",), "ok": True}],
+    ids=["result without query", "verdict without result"],
+)
+def test_search_steps_out_of_order_are_rejected(fields):
+    with pytest.raises(ValidationError):
+        Search(**fields)
+
+
+def test_next_query_clears_the_result_and_verdict_of_the_previous_one():
+    judged = Search(queries=("refund",)).with_result(RESULT_OF_A_SEARCH).judged(False)
+
+    assert judged.with_query("refund policy") == Search(
+        queries=("refund", "refund policy")
+    )

@@ -1,9 +1,9 @@
 import pytest
-from helpers import LOW, REFUND_PASSAGE, retrieval
+from helpers import LOW, REFUND_PASSAGE, searched
 
 from ticket_classifier.config import get_settings
 from ticket_classifier.graph import build_workflow
-from ticket_classifier.models import TicketClassification
+from ticket_classifier.models import TicketClassification, initial_state
 from ticket_classifier.nodes import TriageError, node_triage
 from ticket_classifier.nodes.names import TRIAGE
 from ticket_classifier.prompts import SYSTEM_PROMPT
@@ -14,7 +14,7 @@ def test_calls_the_model_with_prompt_and_schema(model, make_ticket):
         {
             "ticket": make_ticket(text="My card was charged twice"),
             "customer": None,
-            "retrieval": retrieval(),
+            "search": searched(),
         }
     )
 
@@ -34,7 +34,7 @@ def test_no_parsed_output_raises(model, make_ticket):
             {
                 "ticket": make_ticket(id="T-1"),
                 "customer": None,
-                "retrieval": retrieval(),
+                "search": searched(),
             }
         )
 
@@ -44,7 +44,7 @@ def test_custom_event_arrives_before_the_node_update(
 ):
     chunks = list(
         build_workflow().stream(
-            {"ticket": make_ticket(id="T-1")},
+            initial_state(make_ticket(id="T-1")),
             context=workflow_context,
             stream_mode=["updates", "custom"],
         )
@@ -66,7 +66,7 @@ def test_retrieved_passages_reach_the_prompt(model, make_ticket):
         {
             "ticket": make_ticket(),
             "customer": None,
-            "retrieval": retrieval(REFUND_PASSAGE),
+            "search": searched(REFUND_PASSAGE),
         }
     )
 

@@ -4,13 +4,16 @@ from collections.abc import Sequence
 
 import numpy as np
 from anthropic.types import Message
+from langgraph.runtime import Runtime
 
 from ticket_classifier.config import get_settings
-from ticket_classifier.knowledge.store import KnowledgeIndexMissingError
+from ticket_classifier.context import WorkflowContext
+from ticket_classifier.knowledge import KnowledgeIndexMissingError
 from ticket_classifier.models import (
     KnowledgePassage,
     Reply,
     RetrievalResult,
+    Search,
     TicketClassification,
 )
 
@@ -51,21 +54,67 @@ REFUND_PASSAGE = KnowledgePassage(
 )
 
 
-def retrieval(*passages: KnowledgePassage, dropped: int = 0) -> RetrievalResult:
+WEAK_PASSAGE = KnowledgePassage(
+    source="shipping.md", ordinal=2, text="Parcels ship in 2 days.", score=0.3
+)
+
+
+def retrieval(
+    *passages: KnowledgePassage, weak: Sequence[KnowledgePassage] = ()
+) -> RetrievalResult:
     """A retrieval result as ``retrieve_knowledge`` stores it, with the configured
     minimum score."""
     return RetrievalResult(
-        passages=list(passages),
+        passages=passages,
+        weak=tuple(weak),
         min_score=get_settings().knowledge_min_score,
-        dropped=dropped,
     )
 
 
+def searched(
+    *passages: KnowledgePassage,
+    weak: Sequence[KnowledgePassage] = (),
+    queries: Sequence[str] = ("query",),
+) -> Search:
+    """A search after ``retrieve_knowledge``, not judged yet."""
+    return Search(queries=tuple(queries), result=retrieval(*passages, weak=weak))
+
+
+def echo_query(ticket, search):
+    """Fake ``write_query``: the ticket text is the query."""
+    return ticket.text
+
+
+def runtime(knowledge, write_query=echo_query) -> Runtime[WorkflowContext]:
+    """The runtime a node gets inside a run, for calling it alone."""
+    return Runtime(
+        context=WorkflowContext(knowledge=knowledge, write_query=write_query)
+    )
+
+
+class ScriptedQueries:
+    """Fake ``write_query``: one answer per call, in order; an exception is raised.
+    Records the search each call got."""
+
+    def __init__(self, *answers: str | Exception):
+        self.answers = list(answers)
+        self.calls = []
+
+    def __call__(self, ticket, search):
+        self.calls.append(search)
+        answer = self.answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
 class FakeKnowledge:
-    """Fake knowledge base: the same passages for every query; records the queries."""
+    """Fake knowledge base: the passages in ``by_query`` for a query listed there,
+    else ``passages``; records the queries."""
 
     def __init__(self, passages=(REFUND_PASSAGE,)):
         self.passages = list(passages)
+        self.by_query = {}
         self.queries = []
         self.index_missing = False
 
@@ -76,7 +125,7 @@ class FakeKnowledge:
 
     def search(self, query: str, k: int) -> list[KnowledgePassage]:
         self.queries.append((query, k))
-        return self.passages[:k]
+        return self.by_query.get(query, self.passages)[:k]
 
 
 REPLY_TEXT = "Thanks for reaching out, the team is looking into it."

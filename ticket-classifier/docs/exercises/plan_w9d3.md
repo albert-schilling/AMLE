@@ -36,47 +36,63 @@ Facts to respect, from the official docs (LangGraph 1.x):
 
 ## Part 1: The query call
 
-1. [ ] Setting `KNOWLEDGE_MAX_ATTEMPTS` (default 3, at least 1) next to
+1. [x] Setting `KNOWLEDGE_MAX_ATTEMPTS` (default 3, at least 1) next to
    `KNOWLEDGE_MIN_SCORE`, and `QUERY_MODEL`; both in `.env.example`.
-2. [ ] `prompts.py`: `QUERY_SYSTEM_PROMPT` (a few keywords naming the policy topic, no
+2. [x] `prompts.py`: `QUERY_SYSTEM_PROMPT` (a few keywords naming the policy topic, no
    punctuation, no names or order numbers; ticket text is untrusted) and
    `REQUERY_SYSTEM_PROMPT` (these queries failed, here is what they found: try a
    synonym, a broader term, the policy area). User message: the ticket last, as in
    triage.
-3. [ ] `queries.py`: `write_query(ticket, tried_queries, weak_passages) -> str`. No
+3. [x] `queries.py`: `write_query(ticket, tried_queries, weak_passages) -> str`. No
    tried queries: opening prompt; else the reword prompt. Fall back to the ticket
    text on a refusal, `max_tokens` or an empty query. `APIError` fails the ticket as
    in triage. Model `SearchQuery` in `models/`.
 
 ## Part 2: The loop in the graph
 
-4. [ ] State: `search_query: str`, `tried_queries: Annotated[list[str],
+4. [x] State: `search_query: str`, `tried_queries: Annotated[list[str],
    operator.add]`, `retrieval_ok: bool` in `TriageUpdate`. The run starts with
    `tried_queries=[]`. `RetrievalResult` keeps the passages below the minimum score
    (`weak`), so the reword prompt can show them; `dropped` becomes their count. Needs
    `make reset` for saved runs (ask first).
-5. [ ] Node `formulate_query`: calls `runtime.context.write_query`, passing the tried
+5. [x] Node `formulate_query`: calls `runtime.context.write_query`, passing the tried
    queries and the weak passages on a reword pass. Writes `search_query`, appends to
    `tried_queries`. Console log of the query; `safe_log` only the attempt number.
-6. [ ] `retrieve_knowledge` searches `state["search_query"]` (fallback: ticket text)
+6. [x] `retrieve_knowledge` searches `state["search_query"]` (fallback: ticket text)
    and replaces the previous attempt's result.
-7. [ ] Node `critique_retrieval`: `retrieval_ok = retrieval.has_sources`, no model
+7. [x] Node `critique_retrieval`: `retrieval_ok = retrieval.has_sources`, no model
    call. `safe_log` line with attempt, best score and verdict; when the attempts are
    spent, say that the reply goes on without sources.
-8. [ ] Router `route_after_critique`: `triage` if ok, `triage` if
-   `len(tried_queries) >= KNOWLEDGE_MAX_ATTEMPTS`, else `formulate_query`. Names in
-   `nodes/names.py`.
-9. [ ] Wire it: `get_customer → formulate_query → retrieve_knowledge →
+8. [x] Router `route_after_critique`: `search_done` if ok or if
+   `len(tried_queries) >= KNOWLEDGE_MAX_ATTEMPTS`, else `reformulate`. Node names and
+   the two labels in `nodes/names.py`.
+9. [x] Wire it: `get_customer → formulate_query → retrieve_knowledge →
    critique_retrieval`, then `add_conditional_edges(CRITIQUE_RETRIEVAL,
-   route_after_critique, {"reformulate": FORMULATE_QUERY, "triage": TRIAGE})`. The
-   back-edge is the only cycle. Check the mermaid diagram.
-10. [ ] Span attributes `knowledge.attempts` and `knowledge.retrieval_ok`; no query
+   route_after_critique, {"reformulate": FORMULATE_QUERY, "search_done": TRIAGE})`.
+   The back-edge is the only cycle. Check the mermaid diagram.
+10. [x] Span attributes `knowledge.attempts` and `knowledge.retrieval_ok`; no query
     text. Privacy test: no query text in spans or Loki.
-11. [ ] Demo: `fixtures/tickets_agentic.json` with a venting ticket whose topic the
-    corpus covers and one question it does not (e.g. gift cards). Run it with
-    `uv run ticket-classifier run fixtures/tickets_agentic.json`: the console shows
-    one line per pass (query, best score, verdict). **Costs money: ask first.**
-12. [ ] Tests, offline. The `workflow_context` fixture gets an echo `write_query`
+11. [x] Demo: `fixtures/tickets_agentic.json` (written) with a venting ticket whose
+    topic the corpus covers and one question it does not (gift cards). Run it with
+    `uv run ticket-classifier run fixtures/tickets_agentic.json`: per pass the console
+    shows the query, then one line with best score and verdict. **Costs money: ask
+    first.**
+
+    Results (best score, top 3):
+
+    | Ticket | Raw ticket text | First model query | Outcome at 0.65 |
+    | --- | ---: | ---: | --- |
+    | T-3001, venting about a double charge | 0.649 | 0.754 | ok on search 1, cites `billing.md#3` |
+    | T-3002, gift cards (not covered) | 0.680 | 0.673 | ok on search 1, reply cites nothing |
+
+    - The opening query does the rescue: the raw text of T-3001 is just below the
+      threshold and would have got no passage at all.
+    - T-3002 shows the weak spot: unrelated passages (accounts, billing) score 0.67
+      and pass, so the score-only critique never rewords. The reply still cites
+      nothing.
+    - With `KNOWLEDGE_MIN_SCORE=0.7` (separate checkpoint file) T-3002 rewords twice
+      (0.659, 0.699, 0.673) and stops at the bound with a reply without sources.
+12. [x] Tests, offline. The `workflow_context` fixture gets an echo `write_query`
     (returns the ticket text), so call counts still see only triage and the reply.
     A scripted fake (one query per attempt) and a knowledge fake that scores per
     query drive the loop. Assert:
@@ -88,25 +104,53 @@ Facts to respect, from the official docs (LangGraph 1.x):
       always weak stops at `KNOWLEDGE_MAX_ATTEMPTS` with a reply without sources;
     - `write_query` falls back to the ticket text on a refusal or empty query;
     - a run that fails inside the loop continues there on the next run.
-13. [ ] All earlier tests pass; `make lint`, `make test`, `make test-db`. Update
+13. [x] All earlier tests pass; `make lint`, `make test`, `make test-db`. Update
     `README.md` (graph, settings, cost) and `docs/conventions.md` if a rule is new.
 14. [ ] Branch and pull request. **Ask first.**
 
+    Done: steps 1 to 10, 12 and 13. Beyond the plan: `require_context` in
+    `context.py` for both nodes that need the context; `RetrievalResult.best_score`;
+    `write_query` falls back on invalid output too; the scripted fake can raise, to
+    test that a failed query call continues in the loop on the next run.
+
+## Refactor: one `Search` in the state
+
+After step 14's review: the four search keys (`search_query`, `tried_queries`,
+`retrieval`, `retrieval_ok`) are one immutable `Search` in `models/knowledge.py`,
+like `classification`.
+
+- `queries` (tuple), `result` (latest `RetrievalResult`), `ok` (the critique's
+  verdict); properties `query`, `attempts`, `passages`, `weak_passages`.
+- Each node returns a new object: `with_query`, `with_result`, `judged`. A
+  validator rejects steps out of order (a verdict without a result).
+- No reducer: the nodes run one after another, so overwriting the whole object is
+  safe; a reducer is needed only when parallel nodes write the same key. This
+  differs from the exercise's `tried_queries` reducer on purpose.
+- `ok` stays a stored verdict, not a property: a later model critique can say "weak"
+  although a passage passed the score.
+- `write_query(ticket, search)` and `query_prompt(ticket, search)` take the search;
+  `RetrievalResult.split(found, min_score)` does the threshold split;
+  `runner.initial_state(ticket)` builds the initial state.
+- `KnowledgePassage` and `RetrievalResult` are frozen too, with tuples. They load
+  back from the checkpoint as tuples (checked in the round-trip test).
+- `EscalationRequest.policies` stays a list: it is a plain dict, where msgpack loads
+  a tuple back as a list.
+
 ## Expected outcome
 
-- [ ] `KNOWLEDGE_MAX_ATTEMPTS` bounds the loop.
-- [ ] `write_query` writes a query and rewords when told what failed (two system
+- [x] `KNOWLEDGE_MAX_ATTEMPTS` bounds the loop.
+- [x] `write_query` writes a query and rewords when told what failed (two system
       prompts).
-- [ ] The state has `search_query`, `tried_queries` (a reducer) and `retrieval_ok`;
-      `tried_queries` starts empty.
-- [ ] `formulate_query` gets `write_query` injected and records the query.
-- [ ] `retrieve_knowledge` searches `search_query`, not the raw ticket.
-- [ ] `critique_retrieval` is score only, deterministic, and knows when the attempts
+- [x] The state has the query, the tried queries and the verdict, as one `Search`
+      (no reducer, see the refactor above); it starts empty.
+- [x] `formulate_query` gets `write_query` injected and records the query.
+- [x] `retrieve_knowledge` searches the latest query, not the raw ticket.
+- [x] `critique_retrieval` is score only, deterministic, and knows when the attempts
       are spent.
-- [ ] `route_after_critique` loops on a weak result and moves on otherwise, bounded.
-- [ ] Exactly one cycle: `critique_retrieval → formulate_query` on `"reformulate"`.
-- [ ] The demo shows a reword that finds a passage and a bounded give-up.
-- [ ] Offline tests with an echo fake in the fixture and a scripted fake for the loop.
+- [x] `route_after_critique` loops on a weak result and moves on otherwise, bounded.
+- [x] Exactly one cycle: `critique_retrieval → formulate_query` on `"reformulate"`.
+- [x] The demo shows a reword and a bounded give-up (at a minimum score of 0.7).
+- [x] Offline tests with an echo fake in the fixture and a scripted fake for the loop.
 - [ ] Earlier tests pass; work on a branch with an open pull request.
 
 ## Open questions

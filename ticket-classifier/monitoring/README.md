@@ -92,6 +92,9 @@ this stack; some return nothing until a run produces a match.
 # Tickets that got one policy part (matches any element of the list)
 {resource.service.name="ticket-classifier" && span.knowledge.sources = "warranty.md#3"} | select(span.ticket_id, span.knowledge.sources)
 
+# Tickets that needed a reworded search
+{resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.knowledge.attempts > 1} | select(span.ticket_id, span.knowledge.attempts, span.knowledge.retrieval_ok)
+
 # Replies without sources
 {resource.service.name="ticket-classifier" && name=~"ticket\\.(run|resume)" && span.reply.has_sources = false} | select(span.ticket_id, span.knowledge.passages, span.knowledge.dropped)
 
@@ -262,8 +265,10 @@ flowchart LR
 - **Knowledge:** ticket spans have `knowledge.passages` (count), `knowledge.dropped`
   (found, but below `KNOWLEDGE_MIN_SCORE`), `knowledge.sources` (citations such as
   `refunds.md#2`, best first) and `knowledge.top_score` (cosine similarity of the
-  best passage; missing without passages). They are read from the saved state, so a
-  reused run has them too.
+  best passage; missing without passages), `knowledge.attempts` (searches, with
+  rewords) and `knowledge.retrieval_ok` (the last search passed the minimum score).
+  They are read from the saved state, so a reused run has them too. The search
+  queries are never exported.
 - **Reply:** ticket spans have `reply.citations` (count), `reply.sources` (the cited
   passages, in order of first use) and `reply.has_sources`. Never the reply text or
   the quotes.

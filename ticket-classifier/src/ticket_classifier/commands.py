@@ -7,15 +7,17 @@ from .checkpoint import open_checkpointer
 from .config import Settings
 from .context import WorkflowContext
 from .graph import build_workflow, write_mermaid
-from .knowledge.documents import load_documents
-from .knowledge.evaluation import (
+from .knowledge import (
+    BuildResult,
     KnowledgeEvaluation,
     compare_chunk_settings,
     compare_thresholds,
+    load_documents,
     load_questions,
+    open_knowledge_base,
 )
-from .knowledge.store import BuildResult, open_knowledge_base
 from .models import ClassifiedTicket, HumanAnswer, Ticket
+from .queries import write_query
 from .runner import BatchResult, resume_ticket, run_all, to_classified_ticket
 from .storage import merge_results, save_results
 from .telemetry import get_loggers, ticket_span
@@ -44,7 +46,7 @@ def run(tickets: list[Ticket], settings: Settings) -> BatchResult:
             workflow = build_workflow(checkpointer)
             write_mermaid(workflow, settings.graph_path)
 
-            context = WorkflowContext(knowledge=knowledge)
+            context = WorkflowContext(knowledge=knowledge, write_query=write_query)
 
             batch = run_all(tickets, workflow=workflow, context=context)
 

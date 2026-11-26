@@ -3,7 +3,7 @@ import os
 
 import psycopg
 import pytest
-from helpers import LOW, FakeKnowledge, reply_message
+from helpers import LOW, FakeKnowledge, echo_query, reply_message
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -86,8 +86,15 @@ def knowledge(mocker):
 
 
 @pytest.fixture
-def workflow_context(knowledge):
-    return WorkflowContext(knowledge=knowledge)
+def query_writer(mocker):
+    """The search query is the ticket text, also in the commands: no model call."""
+    mocker.patch("ticket_classifier.commands.write_query", echo_query)
+    return echo_query
+
+
+@pytest.fixture
+def workflow_context(knowledge, query_writer):
+    return WorkflowContext(knowledge=knowledge, write_query=query_writer)
 
 
 @pytest.fixture
@@ -103,11 +110,11 @@ def reply_api(mocker):
 
 
 @pytest.fixture
-def model(mocker, customers_file, knowledge, reply_api):
+def model(mocker, customers_file, knowledge, query_writer, reply_api):
     """Mock the triage call; returns the mocked ``parse`` to count calls.
 
-    Every graph run needs the knowledge base and the reply call too, so this brings
-    their fakes.
+    Every graph run needs the knowledge base, the query writer and the reply call
+    too, so this brings their fakes.
 
     The ticket text picks the outcome via ``model.outcomes[text]``, default ``LOW``.
     An outcome is a classification, None (no parsed output) or an exception.

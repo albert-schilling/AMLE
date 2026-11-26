@@ -1,5 +1,7 @@
 """Turn the model's answer into a ``Reply``: text with numbered citations."""
 
+from collections.abc import Sequence
+
 from anthropic.types import Message
 
 from .models import Citation, KnowledgePassage, Reply
@@ -12,7 +14,7 @@ class ReplyError(RuntimeError):
     """The model gave no usable reply, e.g. a refusal or hitting max_tokens."""
 
 
-def build_reply(message: Message, passages: list[KnowledgePassage]) -> Reply:
+def build_reply(message: Message, passages: Sequence[KnowledgePassage]) -> Reply:
     """Join the text blocks, put ``[n]`` after each cited one, list the sources.
 
     ``passages`` are the search results in request order: a citation's

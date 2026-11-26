@@ -13,6 +13,7 @@ from ticket_classifier.models import (
     KnowledgePassage,
     Reply,
     RetrievalResult,
+    Search,
     Ticket,
     TicketClassification,
 )
@@ -63,18 +64,20 @@ def test_escalation_request_with_models_survives_the_serializer():
     )
 
 
-def test_retrieval_result_and_reply_survive_the_serializer():
+def test_search_and_reply_survive_the_serializer():
+    """Equal only if the tuples load back as tuples, not as lists."""
+    result = RetrievalResult(
+        passages=(
+            KnowledgePassage(source="refunds.md", ordinal=1, text="5 days", score=0.9),
+        ),
+        weak=(
+            KnowledgePassage(source="shipping.md", ordinal=2, text="2 days", score=0.3),
+        ),
+        min_score=0.5,
+    )
     state = {
         "ticket": Ticket(id="T-1", text="x"),
-        "retrieval": RetrievalResult(
-            passages=[
-                KnowledgePassage(
-                    source="refunds.md", ordinal=1, text="5 days", score=0.9
-                )
-            ],
-            min_score=0.5,
-            dropped=2,
-        ),
+        "search": Search(queries=("refund",), result=result, ok=True),
         "reply": Reply(
             text="Refunds take 5 days. [1]",
             citations=[Citation(source="refunds.md", ordinal=1, quotes=["5 days"])],

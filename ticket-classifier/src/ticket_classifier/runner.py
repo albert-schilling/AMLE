@@ -18,6 +18,7 @@ from .models import (
     ResolvedTicket,
     Ticket,
     TriageState,
+    initial_state,
 )
 from .nodes import TriageError
 from .replies import ReplyError
@@ -100,7 +101,8 @@ def run_ticket(
             return state_values(saved)
         case "new":
             safe_log.info("Starting run of ticket %s", ticket.id)
-            return run_thread(workflow, TriageState(ticket=ticket), ticket.id, context)
+
+            return run_thread(workflow, initial_state(ticket), ticket.id, context)
 
 
 def resume_ticket(
@@ -118,7 +120,7 @@ def resume_ticket(
     safe_log.info("Resuming ticket %s", ticket_id)
     logger.info("Ticket %s resume answer: %r", ticket_id, answer)
 
-    # No context: a paused run waits at human_review, past retrieve_knowledge.
+    # No context: a paused run waits at human_review, past the knowledge search.
     return run_thread(workflow, Command(resume=answer), ticket_id, context=None)
 
 

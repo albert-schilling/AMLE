@@ -1,6 +1,6 @@
 import pytest
 
-from ticket_classifier.knowledge.documents import NoDocumentsError, load_documents
+from ticket_classifier.knowledge import NoDocumentsError, load_documents
 
 
 def test_loads_markdown_files_sorted_by_name(tmp_path):
