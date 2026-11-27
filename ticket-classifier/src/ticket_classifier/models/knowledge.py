@@ -12,8 +12,12 @@ from pydantic import BaseModel, ConfigDict, model_validator
 class Chunk:
     """One piece of a policy document. ``source`` and ``ordinal`` let us cite it."""
 
-    source: str  # document name, e.g. "refunds.md"
-    ordinal: int  # position in the document, from 0
+    source: str
+    """Document name, e.g. ``refunds.md``."""
+
+    ordinal: int
+    """Position in the document, from 0."""
+
     text: str
 
 
@@ -55,7 +59,9 @@ class RetrievalResult(BaseModel):
     """The threshold used: ``KNOWLEDGE_MIN_SCORE`` at search time."""
 
     @classmethod
-    def split(cls, found: Sequence[KnowledgePassage], min_score: float) -> Self:
+    def split(
+        cls, found: Sequence[KnowledgePassage], min_score: float
+    ) -> RetrievalResult:
         """Split search hits at ``min_score``; the order of ``found`` is kept."""
         return cls(
             passages=tuple(p for p in found if p.score >= min_score),
@@ -163,12 +169,16 @@ class EvalQuestion(BaseModel):
     Labelled by phrase, not by chunk, so it stays valid for any chunk setting.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
 
     id: str
     question: str
-    source: str | None  # None: the knowledge base cannot answer it
-    answer: str | None  # a phrase of the answering passage, as in the document
+
+    source: str | None
+    """None: the knowledge base cannot answer it."""
+
+    answer: str | None
+    """A phrase of the answering passage, as in the document."""
 
     @model_validator(mode="after")
     def source_and_answer_together(self) -> Self:

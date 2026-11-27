@@ -99,6 +99,10 @@ treats `_name` in a model as a private attribute).
 - Code, comments, docs and commit messages in plain, short English.
 - Comments say why, not what.
 - Prefer docstrings to comments where a reader looks things up: modules, classes,
-  functions, properties, and fields of pydantic models (with
+  functions, properties, fields of pydantic models (with
   `use_attribute_docstrings=True`, so the docstring is also the field's
-  description). A `#` comment stays for a note on one line of code.
+  description), TypedDict keys and type aliases. A `#` comment stays for a note on
+  one line of code. Not on `TicketClassification`: its field descriptions would go
+  into the JSON schema sent to the model.
+- A method that builds a new object names its class as return type
+  (`-> Retrieval`); `Self` only where a validator returns `self`.

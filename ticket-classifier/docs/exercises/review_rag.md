@@ -35,15 +35,16 @@ nothing is changed yet. Items 1 to 4 give the most clarity.
 
 ## Smaller
 
-8. [ ] **The docstring rule is applied in one file only.** `models/knowledge.py` has
-   field docstrings; `reply.py`, `results.py` and `domain.py` still have `#`
-   comments. `EscalationRequest.policies` has a two-line comment above the field.
-9. [ ] **Return types.** The `Search` methods return `"Search"`, `split` returns
-   `Self`. Use one style.
-10. [x] **Edge labels and routers.** `REFORMULATE` and `SEARCH_DONE` live in
-    `routing.py`, the node names in `names.py`; both appear in the graph, so they
-    could sit together in `names.py`. The two routers use two styles (node names
-    versus labels with a path map): pick one on purpose, or say why in a comment.
+8. [x] **The docstring rule was applied in one file only.** Done: field comments in
+   `reply.py`, `results.py`, `state.py` (also `EscalationRequest.policies`) and
+   `knowledge.py` are docstrings now; `Ticket` got a class docstring. The rule now
+   covers TypedDict keys and type aliases.
+9. [x] **Return types.** The `Retrieval` methods returned the class, `split` returned
+   `Self`. Done: a method that builds a new object names its class; `Self` only
+   where a validator returns `self` (rule in `conventions.md`).
+10. [x] **Edge labels and routers.** `REFORMULATE` and `SEARCH_DONE` lived in
+    `routing.py`. Done: the labels are in `names.py`; each router's docstring says
+    why it returns node names or labels.
 11. [ ] **No stream event for the query call.** `formulate_query` calls the model
     but sends no `writer` event, unlike triage and the reply. Add "writing search
     query".

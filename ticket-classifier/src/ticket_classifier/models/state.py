@@ -24,10 +24,17 @@ Escalation = Annotated[NotEscalated | Escalated, Field(discriminator="escalated"
 class TriageUpdate(TypedDict, total=False):
     """What a node returns: only the keys it writes. All keys may be missing."""
 
-    customer: Customer | None  # None: no id, unknown, or unreadable
-    retrieval: Retrieval  # queries, latest result and verdict
+    customer: Customer | None
+    """None: no id, unknown, or unreadable."""
+
+    retrieval: Retrieval
+    """Queries, latest result and verdict."""
+
     classification: TicketClassification
-    reply: Reply  # draft with cited policies, for a person to send
+
+    reply: Reply
+    """Draft with cited policies, for a person to send."""
+
     escalation: Escalation
 
 
@@ -53,10 +60,12 @@ class EscalationRequest(TypedDict):
     ticket: Ticket
     customer: Customer | None
     classification: TicketClassification
-    # The passages triage saw, best first. A list: in a plain dict, msgpack would load
-    # a tuple back as a list.
     policies: list[KnowledgePassage]
-    reply: Reply  # the draft; its citations name the policies it uses
+    """The passages triage saw, best first. A list: in a plain dict, msgpack loads a
+    tuple back as a list."""
+
+    reply: Reply
+    """The draft; its citations name the policies it uses."""
 
 
 class HumanAnswer(TypedDict):

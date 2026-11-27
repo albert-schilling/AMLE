@@ -10,6 +10,8 @@ Product = Literal["Wendel", "Pip", "Brio"]
 
 
 class Ticket(BaseModel):
+    """A support ticket as it comes in."""
+
     id: str
     customer_id: str | None = None
     text: str

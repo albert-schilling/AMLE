@@ -1,14 +1,21 @@
 """The drafted reply to a ticket and the policy passages it cites."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Citation(BaseModel):
     """A policy passage the reply cites, with the text quoted from it."""
 
-    source: str  # document name, e.g. "refunds.md"
-    ordinal: int  # part of the document
-    quotes: list[str]  # cited_text from the API, in the order the reply cites it
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    source: str
+    """Document name, e.g. ``refunds.md``."""
+
+    ordinal: int
+    """Part of the document."""
+
+    quotes: list[str]
+    """``cited_text`` from the API, in the order the reply cites it."""
 
     @property
     def citation(self) -> str:
@@ -19,8 +26,13 @@ class Citation(BaseModel):
 class Reply(BaseModel):
     """A draft for a person to review and send; never sent automatically."""
 
-    text: str  # with [n] after each cited part and the sources listed at the end
-    citations: list[Citation]  # [1] is citations[0], in order of first use
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    text: str
+    """With ``[n]`` after each cited part and the sources listed at the end."""
+
+    citations: list[Citation]
+    """``[1]`` is ``citations[0]``, in order of first use."""
 
     @property
     def has_sources(self) -> bool:

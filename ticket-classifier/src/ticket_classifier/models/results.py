@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .domain import Category, Priority
 from .reply import Reply
@@ -11,11 +11,14 @@ from .reply import Reply
 class TicketResult(BaseModel):
     """Fields every result row has."""
 
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
     ticket_id: str
     customer_id: str | None = None
     category: Category
     priority: Priority
-    reply: Reply  # draft for a person to send, with its cited sources
+    reply: Reply
+    """Draft for a person to send, with its cited sources."""
 
 
 class ResolvedTicket(TicketResult):
@@ -32,7 +35,7 @@ class EscalatedTicket(TicketResult):
     escalation_reason: str
 
 
-# Tagged union on ``escalated``: impossible states cannot be built or loaded.
 ClassifiedTicket = Annotated[
     ResolvedTicket | EscalatedTicket, Field(discriminator="escalated")
 ]
+"""Tagged union on ``escalated``: impossible states cannot be built or loaded."""
