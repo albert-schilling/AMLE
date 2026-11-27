@@ -74,8 +74,15 @@ class RetrievalResult(BaseModel):
         return len(self.weak)
 
     @property
-    def best_score(self) -> float | None:
-        """The highest score found, passed or not; None if the search found nothing."""
+    def top_score(self) -> float | None:
+        """The score of the best passage that passed the threshold; None if none
+        passed. On the span as ``knowledge.top_score``."""
+        return self.passages[0].score if self.passages else None
+
+    @property
+    def best_found_score(self) -> float | None:
+        """The highest score found, passed or not; None if the search found nothing.
+        Unlike ``top_score`` it shows how close a weak search came."""
         return max((p.score for p in self.passages + self.weak), default=None)
 
 
@@ -123,6 +130,11 @@ class Retrieval(BaseModel):
     def weak_passages(self) -> tuple[KnowledgePassage, ...]:
         """The latest result's passages below the threshold, for a reword prompt."""
         return self.result.weak if self.result else ()
+
+    def can_reword(self, max_attempts: int) -> bool:
+        """Judged weak with attempts left: worth another query. The one place that
+        decides between a reword and going on."""
+        return self.ok is False and self.attempts < max_attempts
 
     def with_query(self, query: str) -> Retrieval:
         """Start the next attempt. Result and verdict belonged to the previous query,

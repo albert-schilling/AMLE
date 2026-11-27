@@ -1,7 +1,7 @@
 from typing import Literal
 
 from ..config import get_settings
-from ..models import Retrieval, TriageState
+from ..models import TriageState
 from .names import HUMAN_REVIEW, MARK_HANDLED, REFORMULATE, RETRIEVAL_DONE
 
 
@@ -25,12 +25,9 @@ def route_after_critique(
     labels, not node names: ``graph.py`` maps them, and the diagram shows them on
     the edges.
     """
-    retrieval = state["retrieval"]
-    if retrieval.ok or attempts_spent(retrieval):
-        return RETRIEVAL_DONE
-    return REFORMULATE
 
+    can_reword = state["retrieval"].can_reword(get_settings().knowledge_max_attempts)
 
-def attempts_spent(retrieval: Retrieval) -> bool:
-    """``KNOWLEDGE_MAX_ATTEMPTS`` searches are done: no reword is left."""
-    return retrieval.attempts >= get_settings().knowledge_max_attempts
+    if can_reword:
+        return REFORMULATE
+    return RETRIEVAL_DONE

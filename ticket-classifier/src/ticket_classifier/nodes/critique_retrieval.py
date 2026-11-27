@@ -1,7 +1,6 @@
 from ..config import get_settings
 from ..models import TriageState, TriageUpdate
 from ..telemetry import get_loggers
-from .routing import attempts_spent
 
 logger, safe_log = get_loggers(__name__)
 
@@ -18,21 +17,22 @@ def node_critique_retrieval(state: TriageState) -> TriageUpdate:
     retrieval = state["retrieval"]
     if retrieval.result is None:
         raise MissingResultError("critique_retrieval needs a search result")
-    ok = retrieval.result.has_sources
+    judged = retrieval.judged(retrieval.result.has_sources)
+    max_attempts = get_settings().knowledge_max_attempts
 
-    if ok:
+    if judged.ok:
         verdict = "ok"
-    elif attempts_spent(retrieval):
-        verdict = "weak, attempts spent: the reply goes on without sources"
-    else:
+    elif judged.can_reword(max_attempts):
         verdict = "weak, rewording the query"
-    best = retrieval.result.best_score
+    else:
+        verdict = "weak, attempts spent: the reply goes on without sources"
+    best = retrieval.result.best_found_score
     safe_log.info(
-        "Ticket %s attempt %d of %d: best score %s, %s",
+        "Ticket %s attempt %d of %d: best found score %s, %s",
         state["ticket"].id,
-        retrieval.attempts,
-        get_settings().knowledge_max_attempts,
+        judged.attempts,
+        max_attempts,
         "none" if best is None else f"{best:.3f}",
         verdict,
     )
-    return {"retrieval": retrieval.judged(ok)}
+    return {"retrieval": judged}

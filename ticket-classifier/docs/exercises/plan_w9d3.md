@@ -63,12 +63,12 @@ Facts to respect, from the official docs (LangGraph 1.x):
 7. [x] Node `critique_retrieval`: `retrieval_ok = retrieval.has_sources`, no model
    call. `safe_log` line with attempt, best score and verdict; when the attempts are
    spent, say that the reply goes on without sources.
-8. [x] Router `route_after_critique`: `search_done` if ok or if
+8. [x] Router `route_after_critique`: `retrieval_done` if ok or if
    `len(tried_queries) >= KNOWLEDGE_MAX_ATTEMPTS`, else `reformulate`. Node names and
    the two labels in `nodes/names.py`.
 9. [x] Wire it: `get_customer → formulate_query → retrieve_knowledge →
    critique_retrieval`, then `add_conditional_edges(CRITIQUE_RETRIEVAL,
-   route_after_critique, {"reformulate": FORMULATE_QUERY, "search_done": TRIAGE})`.
+   route_after_critique, {"reformulate": FORMULATE_QUERY, "retrieval_done": TRIAGE})`.
    The back-edge is the only cycle. Check the mermaid diagram.
 10. [x] Span attributes `knowledge.attempts` and `knowledge.retrieval_ok`; no query
     text. Privacy test: no query text in spans or Loki.
@@ -113,11 +113,13 @@ Facts to respect, from the official docs (LangGraph 1.x):
     `write_query` falls back on invalid output too; the scripted fake can raise, to
     test that a failed query call continues in the loop on the next run.
 
-## Refactor: one `Search` in the state
+## Refactor: one `Retrieval` in the state
 
 After step 14's review: the four search keys (`search_query`, `tried_queries`,
-`retrieval`, `retrieval_ok`) are one immutable `Search` in `models/knowledge.py`,
-like `classification`.
+`retrieval`, `retrieval_ok`) are one immutable `Retrieval` in `models/knowledge.py`,
+like `classification`. It was first called `Search`; renamed so one word,
+retrieval, names the whole step (query, search, judge, reword) and "search" only
+the call to the knowledge base (`KnowledgeSearch.search`).
 
 - `queries` (tuple), `result` (latest `RetrievalResult`), `ok` (the critique's
   verdict); properties `query`, `attempts`, `passages`, `weak_passages`.
@@ -130,7 +132,7 @@ like `classification`.
   although a passage passed the score.
 - `write_query(ticket, search)` and `query_prompt(ticket, search)` take the search;
   `RetrievalResult.split(found, min_score)` does the threshold split;
-  `runner.initial_state(ticket)` builds the initial state.
+  `models.state.initial_state(ticket)` builds the initial state.
 - `KnowledgePassage` and `RetrievalResult` are frozen too, with tuples. They load
   back from the checkpoint as tuples (checked in the round-trip test).
 - `EscalationRequest.policies` stays a list: it is a plain dict, where msgpack loads
@@ -141,7 +143,7 @@ like `classification`.
 - [x] `KNOWLEDGE_MAX_ATTEMPTS` bounds the loop.
 - [x] `write_query` writes a query and rewords when told what failed (two system
       prompts).
-- [x] The state has the query, the tried queries and the verdict, as one `Search`
+- [x] The state has the query, the tried queries and the verdict, as one `Retrieval`
       (no reducer, see the refactor above); it starts empty.
 - [x] `formulate_query` gets `write_query` injected and records the query.
 - [x] `retrieve_knowledge` searches the latest query, not the raw ticket.

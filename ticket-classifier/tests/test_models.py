@@ -73,3 +73,20 @@ def test_next_query_clears_the_result_and_verdict_of_the_previous_one():
     assert judged.with_query("refund policy") == Retrieval(
         queries=("refund", "refund policy")
     )
+
+
+@pytest.mark.parametrize(
+    ("ok", "attempts", "can_reword"),
+    [(True, 1, False), (False, 1, True), (False, 3, False)],
+    ids=["ok", "weak with attempts left", "weak and attempts spent"],
+)
+def test_can_reword_only_a_weak_result_with_attempts_left(ok, attempts, can_reword):
+    retrieval = Retrieval(
+        queries=("query",) * attempts, result=RESULT_OF_A_SEARCH, ok=ok
+    )
+
+    assert retrieval.can_reword(max_attempts=3) is can_reword
+
+
+def test_cannot_reword_before_the_verdict():
+    assert not Retrieval(queries=("query",), result=RESULT_OF_A_SEARCH).can_reword(3)

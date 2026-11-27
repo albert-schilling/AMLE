@@ -20,7 +20,7 @@ Write clean code for humans: code a reader understands on the first pass.
 ## Structure
 
 - `models/` holds data (pydantic models, TypedDicts, `Literal` types) and only the
-  code that builds or reads it, like `initial_state` or `Search.with_query`: no I/O,
+  code that builds or reads it, like `initial_state` or `Retrieval.with_query`: no I/O,
   no model calls, no settings.
   Input in `domain.py`, graph state in `state.py`, output rows in `results.py`.
 - A package exports its public interface in `__init__.py` (with `__all__`), and the
@@ -40,7 +40,7 @@ Write clean code for humans: code a reader understands on the first pass.
 - A new type in the graph state joins `CHECKPOINT_TYPES`, or it loads back as a plain
   dict.
 - Models in the graph state are immutable: `frozen=True`, tuples instead of lists. A
-  node returns a new object (e.g. `search.with_query(query)`), never edits one in
+  node returns a new object (e.g. `retrieval.with_query(query)`), never edits one in
   place. Build new objects with the constructor; `model_copy(update=...)` skips
   validation.
 - A `Protocol` lives with the code that uses it, not with the code that implements it.

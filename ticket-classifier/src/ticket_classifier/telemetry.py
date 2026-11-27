@@ -29,7 +29,7 @@ from opentelemetry.trace import Status, StatusCode
 
 from .checkpoint import thread_config
 from .config import Settings
-from .models import TriageState
+from .models import Reply, Retrieval, TicketClassification, TriageState
 
 # Only our own loggers go to Loki: not the SDK's export logs (no feedback loop), not
 # TraceVerde's or the Anthropic SDK's.
@@ -205,52 +205,58 @@ def ticket_span(
 
 
 def record_state(state: TriageState) -> None:
-    """Put what the state has so far on the current span: policy passages, retrieval
-    attempts and verdict, category, priority and the reply's citations.
+    """Put what the state has so far on the current span: retrieval, classification
+    and reply, each once its node has run.
 
     Passages and reply only as citations, counts and scores: their text, the quotes
     and the search queries stay out.
     """
     span = trace.get_current_span()
+    if (retrieval := state.get("retrieval")) is not None:
+        record_retrieval(span, retrieval)
+    if (classification := state.get("classification")) is not None:
+        record_classification(span, classification)
+    if (reply := state.get("reply")) is not None:
+        record_reply(span, reply)
 
-    retrieval = state.get("retrieval")
-    result = retrieval.result if retrieval is not None else None
-    if result is not None:
-        passages = result.passages
-        span.set_attributes(
-            {
-                "knowledge.passages": len(passages),
-                "knowledge.dropped": result.dropped,
-                "knowledge.sources": [passage.citation for passage in passages],
-            }
-        )
-        if passages:
-            span.set_attribute("knowledge.top_score", passages[0].score)
 
-    classification = state.get("classification")
-
-    if classification is not None:
-        span.set_attributes(
-            {
-                "category": classification.category,
-                "priority": classification.priority,
-            }
-        )
-
-    if retrieval is not None and retrieval.attempts:
+def record_retrieval(span: trace.Span, retrieval: Retrieval) -> None:
+    """Attempts and verdict, and the latest result's passages as citations."""
+    if retrieval.attempts:
         span.set_attribute("knowledge.attempts", retrieval.attempts)
-    if retrieval is not None and retrieval.ok is not None:
+    if retrieval.ok is not None:
         span.set_attribute("knowledge.retrieval_ok", retrieval.ok)
+    result = retrieval.result
+    if result is None:
+        return
+    span.set_attributes(
+        {
+            "knowledge.passages": len(result.passages),
+            "knowledge.dropped": result.dropped,
+            "knowledge.sources": [passage.citation for passage in result.passages],
+        }
+    )
+    if result.top_score is not None:
+        span.set_attribute("knowledge.top_score", result.top_score)
 
-    reply = state.get("reply")
-    if reply is not None:
-        span.set_attributes(
-            {
-                "reply.citations": len(reply.citations),
-                "reply.sources": [citation.citation for citation in reply.citations],
-                "reply.has_sources": reply.has_sources,
-            }
-        )
+
+def record_classification(
+    span: trace.Span, classification: TicketClassification
+) -> None:
+    span.set_attributes(
+        {"category": classification.category, "priority": classification.priority}
+    )
+
+
+def record_reply(span: trace.Span, reply: Reply) -> None:
+    """Citations as labels and counts; never the reply text or the quotes."""
+    span.set_attributes(
+        {
+            "reply.citations": len(reply.citations),
+            "reply.sources": [citation.citation for citation in reply.citations],
+            "reply.has_sources": reply.has_sources,
+        }
+    )
 
 
 def record_status(status: TicketStatus) -> None:

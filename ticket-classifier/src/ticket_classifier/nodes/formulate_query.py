@@ -12,7 +12,7 @@ def node_formulate_query(
     state: TriageState, runtime: Runtime[WorkflowContext]
 ) -> TriageUpdate:
     """Write the next search query. After a weak search, the writer sees the queries
-    that failed and the passages they found, so it can move away from them."""
+    that failed and the passages the last one found, so it can move away from them."""
     context = require_context(runtime, FORMULATE_QUERY)
     ticket = state["ticket"]
     retrieval = state["retrieval"]
