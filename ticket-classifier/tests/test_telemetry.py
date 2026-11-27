@@ -190,13 +190,15 @@ def test_unmarked_line_is_not_exported_but_still_logged(exported_logs, caplog):
 
 
 def test_run_and_resume_export_no_ticket_customer_policy_query_or_reply_text(
-    model, knowledge, reply_api, write_tickets, exported_logs, monkeypatch
+    model,
+    knowledge,
+    reply_api,
+    write_tickets,
+    exported_logs,
+    monkeypatch,
+    private_query_writer,
 ):
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
-    monkeypatch.setattr(
-        "ticket_classifier.commands.write_query",
-        lambda ticket, retrieval: "private query",
-    )
     knowledge.passages = [
         KnowledgePassage(source="refunds.md", ordinal=1, text="private policy", score=1)
     ]

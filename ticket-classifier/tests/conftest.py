@@ -93,6 +93,15 @@ def query_writer(mocker):
 
 
 @pytest.fixture
+def private_query_writer(mocker):
+    """Queries that must never be exported: "private query 0", "private query 1", ..."""
+    mocker.patch(
+        "ticket_classifier.commands.write_query",
+        lambda ticket, retrieval: f"private query {retrieval.attempts}",
+    )
+
+
+@pytest.fixture
 def workflow_context(knowledge, query_writer):
     return WorkflowContext(knowledge=knowledge, write_query=query_writer)
 

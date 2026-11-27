@@ -2,14 +2,15 @@
 SHELL := /bin/bash
 
 # .PHONY tells Make that these targets are commands, not actual files on disk
-.PHONY: format lint setup test run approve decline reset help \
+.PHONY: format lint setup test unit-test test-db-ready run approve decline reset help \
 	obs-up obs-down obs-check obs-usage db-up db-down db-check test-db test-embedding kb-index kb-eval
 
 # The default target that runs if you just type 'make'
 help:
 	@echo "Available commands:"
 	@echo "  make setup   - Install dependencies and prepare the project"
-	@echo "  make test    - Run the project test suite"
+	@echo "  make test    - Run all tests: unit, PostgreSQL and the real embedding model (needs make db-up)"
+	@echo "  make unit-test - Run the tests without database or embedding model"
 	@echo "  make format  - Format the code using ruff"
 	@echo "  make lint    - Lint with ruff and check types with mypy (strict, src only)"
 	@echo "  make run     - Run the classifier script"
@@ -31,7 +32,11 @@ help:
 setup:
 	uv sync
 
-test:
+# All tests in one run: the database and embedding tests are not skipped.
+test: test-db-ready
+	@$(TEST_DB_ENV) RUN_EMBEDDING_TEST=1 uv run pytest
+
+unit-test:
 	uv run pytest
 
 format:
@@ -102,12 +107,15 @@ db-check:
 	test -n "$$version" && echo "OK    pgvector $$version" || { echo "FAIL  pgvector"; exit 1; }
 
 # Tests that need PostgreSQL use their own database; each test is rolled back.
-test-db:
+TEST_DB_ENV = set -a; . database/.env; set +a; \
+	KNOWLEDGE_TEST_DATABASE_URL="postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/knowledge_test"
+
+test-db-ready:
 	@echo "select 1 from pg_database where datname = 'knowledge_test'" | $(DB_PSQL) | grep -q 1 \
 		|| echo "create database knowledge_test" | $(DB_PSQL)
-	@set -a; . database/.env; set +a; \
-	KNOWLEDGE_TEST_DATABASE_URL="postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/knowledge_test" \
-		uv run pytest -m postgres
+
+test-db: test-db-ready
+	@$(TEST_DB_ENV) uv run pytest -m postgres
 
 # The real model, from output/fastembed (downloaded on first use).
 test-embedding:

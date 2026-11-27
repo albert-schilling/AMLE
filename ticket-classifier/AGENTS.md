@@ -7,15 +7,17 @@ pauses high-priority ones for a human. Module map: the Layout table in
 ## Commands
 
 ```sh
-make test            # pytest; never calls the API, no database
+make unit-test       # pytest; never calls the API, no database
+make test            # all tests: unit, PostgreSQL, embedding model (needs make db-up)
 make test-db         # tests against PostgreSQL (needs make db-up)
 make test-embedding  # the one test with the real embedding model
 make lint            # ruff check and mypy (strict, src only)
 make format          # ruff format
 ```
 
-- Run `make lint`, `make format` and `make test` after every change. After a change
-  in `knowledge/` or to SQL, also run `make test-db`.
+- Run `make lint`, `make format` and `make unit-test` after every change. After a
+  change in `knowledge/`, to SQL or to models the store reads, run `make test` (all
+  tests).
 - `make run`, `make approve` and `make decline` use real data, and `make run` calls the
   Anthropic API (costs money; per ticket 1 to 3 search query calls, triage and
   reply). Never run them without asking.

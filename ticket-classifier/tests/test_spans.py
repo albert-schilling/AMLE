@@ -244,12 +244,8 @@ def test_only_a_run_without_work_is_marked_reused(model, write_tickets, finished
 
 
 def test_spans_hold_no_ticket_customer_policy_query_or_reply_text(
-    model, knowledge, reply_api, write_tickets, finished_spans, mocker
+    model, knowledge, reply_api, write_tickets, finished_spans, private_query_writer
 ):
-    mocker.patch(
-        "ticket_classifier.commands.write_query",
-        lambda ticket, retrieval: f"private query {retrieval.attempts}",
-    )
     knowledge.passages = [PRIVATE_PASSAGE]
     reply_api.return_value = reply_message(
         {"text": "private reply text", "cited": [(0, "private policy text")]}

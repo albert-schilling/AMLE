@@ -50,7 +50,8 @@ Facts to respect, from the official docs (LangGraph 1.x):
 
 ## Part 2: The loop in the graph
 
-4. [x] State: `search_query: str`, `tried_queries: Annotated[list[str],
+4. [x] (Later replaced by one `Retrieval` model, see "Refactor" below.) State:
+   `search_query: str`, `tried_queries: Annotated[list[str],
    operator.add]`, `retrieval_ok: bool` in `TriageUpdate`. The run starts with
    `tried_queries=[]`. `RetrievalResult` keeps the passages below the minimum score
    (`weak`), so the reword prompt can show them; `dropped` becomes their count. Needs

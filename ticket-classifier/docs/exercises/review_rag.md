@@ -59,18 +59,18 @@ nothing is changed yet. Items 1 to 4 give the most clarity.
 
 ## Tests
 
-14. [ ] **Two ways to fake the private query.** `test_spans` uses `mocker.patch`,
-    `test_telemetry` uses `monkeypatch.setattr`. One fixture,
-    `private_query_writer`, for both.
-15. [ ] **Helper names.** `searched(...)` is now `retrieved(...)` (item 1). The `ScriptedQueries` docstring:
-    "an exception in the list is raised instead of returned".
-16. [ ] **Untyped fakes.** `echo_query` and `ScriptedQueries` are untyped, `runtime()`
-    is typed. Allowed for tests, but these fakes are where a fake can drift from the
-    `QueryWriter` protocol.
+14. [x] **Two ways to fake the private query.** `test_spans` used `mocker.patch`,
+    `test_telemetry` used `monkeypatch.setattr`. Done: both use the fixture
+    `private_query_writer` in `conftest.py`.
+15. [x] **Helper names.** `searched(...)` is now `retrieved(...)` (item 1). Done: the
+    `ScriptedQueries` docstring says "an exception in the list is raised instead of
+    returned".
+16. [x] **Untyped fakes.** Done: `echo_query`, `ScriptedQueries` and `runtime()` are
+    typed against `Ticket`, `Retrieval` and the `QueryWriter` and `KnowledgeSearch`
+    protocols. mypy checks `src` only, so the types help the reader and the editor.
 
 ## Docs
 
-17. [ ] **`plan_w9d3.md`** describes the old state (`tried_queries`, `retrieval_ok`)
-    in steps 3 to 8 and explains the change only in "Refactor". A one-line pointer at
-    step 4 helps the reader.
-18. [ ] **`NOTES.md`:** the TODO "start_state → initial state" is done.
+17. [x] **`plan_w9d3.md`** describes the old state (`tried_queries`, `retrieval_ok`)
+    in steps 3 to 8. Done: step 4 points to the "Refactor" section.
+18. [x] **`NOTES.md`:** the done TODO "start_state → initial state" is removed.

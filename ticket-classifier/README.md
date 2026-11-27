@@ -204,7 +204,8 @@ OpenTelemetry (off by default): `OTEL_ENABLED`, `OTEL_SERVICE_NAME`,
 ## Development
 
 ```sh
-make test            # pytest, no API calls, no database
+make unit-test       # pytest, no API calls, no database
+make test            # all tests: unit, PostgreSQL, embedding model (needs make db-up)
 make test-db         # tests against PostgreSQL (database knowledge_test)
 make test-embedding  # the one test with the real embedding model
 make reset           # delete saved runs, trace and results

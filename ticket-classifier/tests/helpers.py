@@ -7,13 +7,14 @@ from anthropic.types import Message
 from langgraph.runtime import Runtime
 
 from ticket_classifier.config import get_settings
-from ticket_classifier.context import WorkflowContext
+from ticket_classifier.context import KnowledgeSearch, QueryWriter, WorkflowContext
 from ticket_classifier.knowledge import KnowledgeIndexMissingError
 from ticket_classifier.models import (
     KnowledgePassage,
     Reply,
     Retrieval,
     RetrievalResult,
+    Ticket,
     TicketClassification,
 )
 
@@ -82,12 +83,14 @@ def retrieved(
     )
 
 
-def echo_query(ticket, retrieval):
+def echo_query(ticket: Ticket, retrieval: Retrieval) -> str:
     """Fake ``write_query``: the ticket text is the query."""
     return ticket.text
 
 
-def runtime(knowledge, write_query=echo_query) -> Runtime[WorkflowContext]:
+def runtime(
+    knowledge: KnowledgeSearch, write_query: QueryWriter = echo_query
+) -> Runtime[WorkflowContext]:
     """The runtime a node gets inside a run, for calling it alone."""
     return Runtime(
         context=WorkflowContext(knowledge=knowledge, write_query=write_query)
@@ -95,14 +98,14 @@ def runtime(knowledge, write_query=echo_query) -> Runtime[WorkflowContext]:
 
 
 class ScriptedQueries:
-    """Fake ``write_query``: one answer per call, in order; an exception is raised.
-    Records the retrieval each call got."""
+    """Fake ``write_query``: one answer per call, in order. An exception in the list
+    is raised instead of returned. Records the retrieval each call got."""
 
-    def __init__(self, *answers: str | Exception):
+    def __init__(self, *answers: str | Exception) -> None:
         self.answers = list(answers)
-        self.calls = []
+        self.calls: list[Retrieval] = []
 
-    def __call__(self, ticket, retrieval):
+    def __call__(self, ticket: Ticket, retrieval: Retrieval) -> str:
         self.calls.append(retrieval)
         answer = self.answers.pop(0)
         if isinstance(answer, Exception):

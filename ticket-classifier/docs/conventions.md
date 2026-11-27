@@ -91,7 +91,7 @@ treats `_name` in a model as a private attribute).
   wrong. No tests of constants, declarations, defaults or pydantic itself.
 - Never import from `conftest.py`; shared test data goes in `tests/helpers.py`.
 - Tests that need PostgreSQL are marked `postgres`, use the `knowledge_db` fixture
-  (rolled back after each test) and run with `make test-db`; `make test` skips them.
+  (rolled back after each test) and run with `make test-db` or `make test`; `make unit-test` skips them.
   The knowledge base is faked with `FakeKnowledge` and `KeywordEmbedder`.
 
 ## Writing
