@@ -45,14 +45,17 @@ nothing is changed yet. Items 1 to 4 give the most clarity.
 10. [x] **Edge labels and routers.** `REFORMULATE` and `SEARCH_DONE` lived in
     `routing.py`. Done: the labels are in `names.py`; each router's docstring says
     why it returns node names or labels.
-11. [ ] **No stream event for the query call.** `formulate_query` calls the model
-    but sends no `writer` event, unlike triage and the reply. Add "writing search
-    query".
-12. [ ] **Three "missing step" errors in three modules** (`MissingContextError`,
-    `MissingQueryError`, `MissingResultError`). All are programming errors: one
-    shared error, or `Search` properties that raise, would be simpler.
-13. [ ] **`QUERY_MAX_TOKENS` is a constant**, the reply has the `REPLY_MAX_TOKENS`
-    setting. Fine, but decide on purpose.
+11. [x] **No stream event for the query call.** Done: `formulate_query` sends
+    "writing search query" with ticket id, attempt and model through
+    `runtime.stream_writer`; the query itself stays out.
+12. [x] **Three "missing step" errors in three modules.** Done: `MissingQueryError`
+    and `MissingResultError` are one `RetrievalStepError` in `models/knowledge.py`.
+    `MissingContextError` stays: a run started without context is a different
+    mistake from a graph wired in the wrong order.
+13. [x] **`QUERY_MAX_TOKENS` was a constant**, the reply has the `REPLY_MAX_TOKENS`
+    setting. Done: it is the setting `QUERY_MAX_TOKENS` (default 200) next to
+    `QUERY_MODEL`, since another model can need another limit, and a too-low limit
+    quietly falls back to the ticket text.
 
 ## Tests
 

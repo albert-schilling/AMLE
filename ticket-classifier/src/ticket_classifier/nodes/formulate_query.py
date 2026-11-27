@@ -1,5 +1,6 @@
 from langgraph.runtime import Runtime
 
+from ..config import get_settings
 from ..context import WorkflowContext, require_context
 from ..models import TriageState, TriageUpdate
 from ..telemetry import get_loggers
@@ -16,12 +17,20 @@ def node_formulate_query(
     context = require_context(runtime, FORMULATE_QUERY)
     ticket = state["ticket"]
     retrieval = state["retrieval"]
+    settings = get_settings()
+    attempt = retrieval.attempts + 1
 
+    runtime.stream_writer(
+        {
+            "event": "writing search query",
+            "ticket_id": ticket.id,
+            "attempt": attempt,
+            "model": settings.query_model or settings.model,
+        }
+    )
     query = context.write_query(ticket, retrieval)
 
     # The query can quote the ticket: it stays on the console. critique_retrieval
     # sends the exported line of this attempt.
-    logger.info(
-        "Ticket %s attempt %d query: %r", ticket.id, retrieval.attempts + 1, query
-    )
+    logger.info("Ticket %s attempt %d query: %r", ticket.id, attempt, query)
     return {"retrieval": retrieval.with_query(query)}

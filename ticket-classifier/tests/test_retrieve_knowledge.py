@@ -8,9 +8,8 @@ from langgraph.runtime import Runtime
 from ticket_classifier.checkpoint import thread_config
 from ticket_classifier.context import MissingContextError
 from ticket_classifier.graph import build_workflow
-from ticket_classifier.models import Retrieval
+from ticket_classifier.models import Retrieval, RetrievalStepError
 from ticket_classifier.nodes.retrieve_knowledge import (
-    MissingQueryError,
     node_retrieve_knowledge,
 )
 from ticket_classifier.runner import run_ticket
@@ -50,7 +49,7 @@ def test_splits_off_passages_below_the_minimum_score(
 
 
 def test_without_query_names_the_problem(knowledge, make_ticket):
-    with pytest.raises(MissingQueryError):
+    with pytest.raises(RetrievalStepError):
         node_retrieve_knowledge(
             {"ticket": make_ticket(), "retrieval": Retrieval()}, runtime(knowledge)
         )

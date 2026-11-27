@@ -2,15 +2,11 @@ from langgraph.runtime import Runtime
 
 from ..config import get_settings
 from ..context import WorkflowContext, require_context
-from ..models import RetrievalResult, TriageState, TriageUpdate
+from ..models import RetrievalResult, RetrievalStepError, TriageState, TriageUpdate
 from ..telemetry import get_loggers
 from .names import RETRIEVE_KNOWLEDGE
 
 logger, safe_log = get_loggers(__name__)
-
-
-class MissingQueryError(RuntimeError):
-    """The search has no query: ``formulate_query`` did not run first."""
 
 
 def node_retrieve_knowledge(
@@ -22,7 +18,9 @@ def node_retrieve_knowledge(
     ticket = state["ticket"]
     retrieval = state["retrieval"]
     if retrieval.query is None:
-        raise MissingQueryError(f"{RETRIEVE_KNOWLEDGE} needs a search query")
+        raise RetrievalStepError(
+            f"{RETRIEVE_KNOWLEDGE} needs a query from formulate_query"
+        )
     settings = get_settings()
 
     found = context.knowledge.search(retrieval.query, settings.knowledge_top_k)

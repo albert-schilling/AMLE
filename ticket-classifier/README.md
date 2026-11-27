@@ -164,7 +164,7 @@ Dashboards (user `admin`): [metrics](http://localhost:3000/d/ticket-classifier),
 
 Environment variables or `.env`, see [.env.example](.env.example):
 `ANTHROPIC_API_KEY` (required for `run`), `MODEL`, `MAX_TOKENS`, `REPLY_MODEL`
-(default: `MODEL`), `REPLY_MAX_TOKENS`, `QUERY_MODEL` (default: `MODEL`), `LOG_LEVEL`, `LOG_FILE`,
+(default: `MODEL`), `REPLY_MAX_TOKENS`, `QUERY_MODEL` (default: `MODEL`), `QUERY_MAX_TOKENS`, `LOG_LEVEL`, `LOG_FILE`,
 `TRACE_FILE`, `TICKETS_PATH`, `CUSTOMERS_PATH`, `RESULTS_PATH`,
 `CHECKPOINT_PATH`, `GRAPH_PATH`.
 

@@ -10,15 +10,15 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.runtime import Runtime
 
 from ticket_classifier.checkpoint import thread_config
+from ticket_classifier.config import get_settings
 from ticket_classifier.context import MissingContextError, WorkflowContext
 from ticket_classifier.graph import build_workflow
-from ticket_classifier.models import Retrieval
+from ticket_classifier.models import Retrieval, RetrievalStepError
 from ticket_classifier.nodes import (
     node_critique_retrieval,
     node_formulate_query,
     route_after_critique,
 )
-from ticket_classifier.nodes.critique_retrieval import MissingResultError
 from ticket_classifier.runner import run_ticket
 
 
@@ -45,6 +45,27 @@ def test_reword_gets_the_failed_search(knowledge, make_ticket):
     )
 
 
+def test_formulate_query_reports_the_call_without_the_query(knowledge, make_ticket):
+    events = []
+    context = WorkflowContext(
+        knowledge=knowledge, write_query=ScriptedQueries("refund")
+    )
+
+    node_formulate_query(
+        {"ticket": make_ticket(id="T-1"), "retrieval": Retrieval()},
+        Runtime(context=context, stream_writer=events.append),
+    )
+
+    assert events == [
+        {
+            "event": "writing search query",
+            "ticket_id": "T-1",
+            "attempt": 1,
+            "model": get_settings().model,
+        }
+    ]
+
+
 def test_formulate_query_without_context_names_the_problem(make_ticket):
     with pytest.raises(MissingContextError):
         node_formulate_query(
@@ -63,7 +84,7 @@ def test_critique_passes_a_passage_above_the_minimum_score(make_ticket, retrieva
 
 
 def test_critique_without_result_names_the_problem(make_ticket):
-    with pytest.raises(MissingResultError):
+    with pytest.raises(RetrievalStepError):
         node_critique_retrieval({"ticket": make_ticket(), "retrieval": Retrieval()})
 
 

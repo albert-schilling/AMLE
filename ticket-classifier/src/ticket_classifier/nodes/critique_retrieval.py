@@ -1,12 +1,9 @@
 from ..config import get_settings
-from ..models import TriageState, TriageUpdate
+from ..models import RetrievalStepError, TriageState, TriageUpdate
 from ..telemetry import get_loggers
+from .names import CRITIQUE_RETRIEVAL
 
 logger, safe_log = get_loggers(__name__)
-
-
-class MissingResultError(RuntimeError):
-    """There is no search result to judge: ``retrieve_knowledge`` did not run first."""
 
 
 def node_critique_retrieval(state: TriageState) -> TriageUpdate:
@@ -16,7 +13,9 @@ def node_critique_retrieval(state: TriageState) -> TriageUpdate:
     """
     retrieval = state["retrieval"]
     if retrieval.result is None:
-        raise MissingResultError("critique_retrieval needs a search result")
+        raise RetrievalStepError(
+            f"{CRITIQUE_RETRIEVAL} needs a result from retrieve_knowledge"
+        )
     judged = retrieval.judged(retrieval.result.has_sources)
     max_attempts = get_settings().knowledge_max_attempts
 

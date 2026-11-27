@@ -7,6 +7,7 @@ from .knowledge import (
     KnowledgePassage,
     Retrieval,
     RetrievalResult,
+    RetrievalStepError,
     SearchQuery,
 )
 from .reply import Citation, Reply
@@ -41,6 +42,7 @@ __all__ = [
     "Reply",
     "ResolvedTicket",
     "RetrievalResult",
+    "RetrievalStepError",
     "Retrieval",
     "SearchQuery",
     "Ticket",

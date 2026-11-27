@@ -10,8 +10,6 @@ from .telemetry import get_loggers
 
 logger, safe_log = get_loggers(__name__)
 
-QUERY_MAX_TOKENS = 200  # a few keywords
-
 
 def write_query(ticket: Ticket, retrieval: Retrieval) -> str:
     """The next search query for the ticket; after a failed search, a reworded one.
@@ -26,7 +24,7 @@ def write_query(ticket: Ticket, retrieval: Retrieval) -> str:
     try:
         output = get_client().messages.parse(
             model=settings.query_model or settings.model,
-            max_tokens=QUERY_MAX_TOKENS,
+            max_tokens=settings.query_max_tokens,
             system=system,
             messages=[{"role": "user", "content": content}],
             output_format=SearchQuery,

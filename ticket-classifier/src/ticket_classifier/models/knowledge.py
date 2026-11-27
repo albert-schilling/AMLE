@@ -92,6 +92,10 @@ class RetrievalResult(BaseModel):
         return max((p.score for p in self.passages + self.weak), default=None)
 
 
+class RetrievalStepError(RuntimeError):
+    """A retrieval node ran before the step it needs: the graph is wired wrong."""
+
+
 class Retrieval(BaseModel):
     """The knowledge retrieval of one ticket: every query tried, the latest result and
     the critique's verdict on it. Immutable: each step returns a new object."""

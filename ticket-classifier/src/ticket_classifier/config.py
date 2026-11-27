@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     reply_model: str | None = None  # model for draft_reply; None: the same as MODEL
     reply_max_tokens: int = Field(default=1_000, gt=0)
     query_model: str | None = None  # model for search queries; None: MODEL
+    query_max_tokens: int = Field(default=200, gt=0)  # a few keywords
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_file: Path | None = None  # also write the logs to this file, if set
     trace_file: Path = Path("output/trace.jsonl")  # one JSON line per workflow event

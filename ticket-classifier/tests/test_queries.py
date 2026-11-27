@@ -75,3 +75,11 @@ def test_invalid_output_falls_back_to_the_ticket_text(parse, make_ticket):
     assert (
         write_query(make_ticket(text="Charged twice!"), Retrieval()) == "Charged twice!"
     )
+
+
+def test_uses_query_max_tokens(parse, make_ticket, monkeypatch):
+    monkeypatch.setenv("QUERY_MAX_TOKENS", "50")
+
+    write_query(make_ticket(), Retrieval())
+
+    assert parse.call_args.kwargs["max_tokens"] == 50
